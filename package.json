@@ -38,6 +38,7 @@
   "homepage": "https://github.com/TimaxLacs/geo#readme",
   "description": "",
   "dependencies": {
+    "eruda": "^3.4.3",
     "hasyx": "^0.1.344",
     "ws": "^8.18.3"
   }
