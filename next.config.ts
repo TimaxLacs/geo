@@ -1,5 +1,5 @@
 import type { NextConfig } from "next";
-// Removed fs, path imports as they are no longer needed here
+const path = require('path');
 
 // Use environment variables to determine build mode and base path
 const buildTarget = process.env.NEXT_PUBLIC_BUILD_TARGET;
@@ -89,6 +89,15 @@ const config: NextConfig = {
 
   // Prevent double mount unmount
   reactStrictMode: false,
+  webpack: (config) => {
+    config.resolve.alias = {
+      ...(config.resolve.alias || {}),
+      'geo/components': path.resolve(__dirname, 'components'),
+      'geo/lib': path.resolve(__dirname, 'lib'),
+      'geo/app': path.resolve(__dirname, 'app'),
+    };
+    return config;
+  },
 };
 
 export default config;

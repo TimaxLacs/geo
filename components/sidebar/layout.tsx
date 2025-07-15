@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import { Sidebar } from "geo/components/sidebar";
+import { Sidebar } from 'geo/components/sidebar';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -9,15 +9,15 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
-} from "geo/components/ui/breadcrumb";
-import { Separator } from "geo/components/ui/separator";
+} from 'geo/components/ui/breadcrumb';
+import { Separator } from 'geo/components/ui/separator';
 import {
   SidebarInset,
   SidebarProvider,
   SidebarTrigger,
-} from "geo/components/ui/sidebar";
-import { SidebarData } from "geo/components/sidebar";
-import { UserProfileDropdown } from "./user-profile-dropdown";
+} from 'geo/components/ui/sidebar';
+import { SidebarData } from 'geo/components/sidebar';
+import { UserProfileDropdown } from './user-profile-dropdown';
 
 interface SidebarLayoutProps {
   children: React.ReactNode;

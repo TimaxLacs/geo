@@ -23,10 +23,14 @@
         "name": "next"
       }
     ],
+    "baseUrl": ".",
     "paths": {
       "@/*": [
         "./*"
       ],
+      "geo/components/*": ["components/*"],
+      "geo/lib/*": ["lib/*"],
+      "geo/app/*": ["app/*"],
       "geo": ["./lib/index.ts"],
       "geo/*": ["./*"]
     },
