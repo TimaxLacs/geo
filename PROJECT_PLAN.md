@@ -11,34 +11,34 @@
 ## Этап 1: Настройка проекта и инфраструктуры
 
 ### 1.1 Инициализация проекта
-- [ ] Создать git-репозиторий с названием "geo"
-- [ ] Выполнить `npx hasyx init` для инициализации Hasyx
-- [ ] Настроить переменные окружения в `.env`:
+- [x] Создать git-репозиторий с названием "geo"
+- [x] Выполнить `npx hasyx init` для инициализации Hasyx
+- [x] Настроить переменные окружения в `.env`:
   ```
   NEXT_PUBLIC_HASURA_GRAPHQL_URL=https://your-hasura-instance.herokuapp.com/v1/graphql
   NEXT_PUBLIC_MAIN_URL=http://localhost:3000
   ```
-- [ ] Убедиться, что созданы все необходимые файлы:
-  - `tsconfig.json` и `tsconfig.lib.json` (с правильными путями для проекта)
-  - `package.json` с правильным именем проекта
-  - `next.config.ts` с WebSocket поддержкой
-  - `components.json` для shadcn/ui
-  - `.gitignore`, `.npmignore`, `.npmrc`
-  - `Dockerfile` и `.dockerignore`
-  - `vercel.json` для деплоя
-  - `jest.config.mjs` и `babel.jest.config.mjs` для тестов
+- [x] Убедиться, что созданы все необходимые файлы:
+  - [x] `tsconfig.json` и `tsconfig.lib.json` (с правильными путями для проекта)
+  - [x] `package.json` с правильным именем проекта
+  - [x] `next.config.ts` с WebSocket поддержкой
+  - [x] `components.json` для shadcn/ui
+  - [x] `.gitignore`, `.npmignore`, `.npmrc`
+  - [x] `Dockerfile` и `.dockerignore`
+  - [x] `vercel.json` для деплоя
+  - [x] `jest.config.mjs` и `babel.jest.config.mjs` для тестов
 
 ### 1.2 Настройка через Hasyx Assistant
-- [ ] Запустить `npx hasyx assist`
-- [ ] Настроить все токены (кроме БД - пропустить):
-  - Telegram Bot токены
-  - Vercel интеграция
-  - GitHub токены
-  - Другие необходимые API ключи
-- [ ] Настроить автоматическую загрузку environment variables в GitHub
-- [ ] Интегрировать с Vercel для синхронизации
-- [ ] Настроить GitHub Actions для автоматической публикации в npm
-- [ ] Настроить Docker Hub интеграцию (если требуется)
+- [x] Запустить `npx hasyx assist`
+- [x] Настроить все токены (кроме БД - пропустить):
+  - [x] Telegram Bot токены
+  - [x] Vercel интеграция
+  - [x] GitHub токены
+  - [x] Другие необходимые API ключи
+- [x] Настроить автоматическую загрузку environment variables в GitHub
+- [ ] Интегрировать с Vercel для синхронизации *(требует донастройки VERCEL_ORG_ID и VERCEL_PROJECT_ID)*
+- [x] Настроить GitHub Actions для автоматической публикации в npm
+- [ ] Настроить Docker Hub интеграцию (если требуется) *(логин/токен не введены)*
 
 ### 1.3 Переименование и брендинг
 - [ ] Переименовать проект с "hasyx" на "geo" (TimaxLax Geo)
@@ -51,6 +51,7 @@
 - [ ] Обновить все пути в `tsconfig.json` и `tsconfig.lib.json`
 
 ---
+
 
 ## Этап 2: Изучение и анализ картографических API
 
