@@ -1,0 +1,44 @@
+{
+  "name": "geo",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "npm run unbuild; NODE_OPTIONS=\"--experimental-vm-modules\" jest --verbose --runInBand",
+    "ws": "npx --yes next-ws-cli@latest patch -y",
+    "postinstall": "npm run ws -- -y",
+    "build": "NODE_ENV=production npx -y hasyx build",
+    "unbuild": "npx -y hasyx unbuild",
+    "start": "NODE_ENV=production NODE_OPTIONS=\"--experimental-vm-modules\" npx -y hasyx start",
+    "dev": "NODE_OPTIONS=\"--experimental-vm-modules\" npx -y hasyx dev",
+    "doc:build": "NODE_OPTIONS=\"--experimental-vm-modules\" npx hasyx doc",
+    "migrate": "npx hasyx migrate",
+    "unmigrate": "npx hasyx unmigrate",
+    "events": "NODE_OPTIONS=\"--experimental-vm-modules\" npx hasyx events",
+    "schema": "npx hasyx schema",
+    "npm-publish": "npm run build && npm publish",
+    "cli": "NODE_OPTIONS=\"--experimental-vm-modules\" npx hasyx",
+    "assist": "NODE_OPTIONS=\"--experimental-vm-modules\" npx hasyx assist",
+    "telegram": "NODE_OPTIONS=\"--experimental-vm-modules\" npx hasyx telegram",
+    "js": "NODE_OPTIONS=\"--experimental-vm-modules\" npx hasyx js",
+    "tsx": "NODE_OPTIONS=\"--experimental-vm-modules\" npx hasyx tsx",
+    "logs": "npx hasyx logs",
+    "logs-diffs": "npx hasyx logs-diffs",
+    "logs-states": "npx hasyx logs-states"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TimaxLacs/geo.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/TimaxLacs/geo/issues"
+  },
+  "homepage": "https://github.com/TimaxLacs/geo#readme",
+  "description": "",
+  "dependencies": {
+    "hasyx": "^0.1.344",
+    "ws": "^8.18.3"
+  }
+}

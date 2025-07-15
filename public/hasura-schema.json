@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "tables": [
+    {
+      "table": {
+        "name": "users",
+        "schema": "public"
+      },
+      "array_relationships": [],
+      "object_relationships": [],
+      "insert_permissions": [],
+      "select_permissions": [],
+      "update_permissions": [],
+      "delete_permissions": []
+    }
+  ],
+  "functions": [],
+  "actions": [],
+  "custom_types": {
+    "enums": [],
+    "input_objects": [],
+    "objects": [],
+    "scalars": []
+  }
+} 
