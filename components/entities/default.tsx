@@ -1,12 +1,12 @@
 "use client";
 
 import React from 'react';
-import { Button as UIButton } from 'geo/components/ui/button';
-import { Card as UICard, CardContent, CardHeader, CardTitle } from 'geo/components/ui/card';
-import { Badge } from 'geo/components/ui/badge';
-import { CytoNode as CytoNodeComponent } from 'geo/lib/cyto';
+import { Button as UIButton } from 'hasyx/components/ui/button';
+import { Card as UICard, CardContent, CardHeader, CardTitle } from 'hasyx/components/ui/card';
+import { Badge } from 'hasyx/components/ui/badge';
+import { CytoNode as CytoNodeComponent } from 'hasyx/lib/cyto';
 import { X, Database } from 'lucide-react';
-import { cn } from 'geo/lib/utils';
+import { cn } from 'hasyx/lib/utils';
 
 interface DefaultData {
   id: string;
