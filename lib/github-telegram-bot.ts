@@ -16,10 +16,7 @@ const pckg = fs.existsSync(pckgPath) ? JSON.parse(fs.readFileSync(pckgPath, 'utf
 function getTelegramChannelId(): string | undefined {
   return process.env.TELEGRAM_CHANNEL_ID;
 }
-console.log("=== GITHUB TELEGRAM BOT SCRIPT STARTED ===");
-console.log("TELEGRAM_BOT_TOKEN", process.env.TELEGRAM_BOT_TOKEN);
-console.log("TELEGRAM_CHANNEL_ID", process.env.TELEGRAM_CHANNEL_ID);
-console.log("enabled", process.env.GITHUB_TELEGRAM_BOT);
+
 // Configure GitHub Telegram Bot with the required message for hasyx project
 export const handleGithubTelegramBot = newGithubTelegramBot({
   // Pass all the config here
