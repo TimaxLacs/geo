@@ -1,6 +1,7 @@
 {
   "name": "geo",
   "version": "1.0.0",
+  "description": "",
   "main": "index.js",
   "scripts": {
     "test": "npm run unbuild; NODE_OPTIONS=\"--experimental-vm-modules\" jest --verbose --runInBand",
@@ -25,14 +26,21 @@
     "logs-diffs": "npx hasyx logs-diffs",
     "logs-states": "npx hasyx logs-states"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TimaxLacs/geo.git"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/TimaxLacs/geo/issues"
+  },
+  "homepage": "https://github.com/TimaxLacs/geo#readme",
   "dependencies": {
     "hasyx": "^0.1.344",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0",
     "ws": "^8.18.3"
   }
 }
