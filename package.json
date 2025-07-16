@@ -41,6 +41,7 @@
   "dependencies": {
     "eruda": "^3.4.3",
     "hasyx": "^0.1.344",
+    "next-ymaps3-components": "^1.0.2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "ws": "^8.18.3"
