@@ -33,14 +33,16 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
+  "type": "module",
   "bugs": {
     "url": "https://github.com/TimaxLacs/geo/issues"
   },
   "homepage": "https://github.com/TimaxLacs/geo#readme",
   "dependencies": {
+    "eruda": "^3.4.3",
     "hasyx": "^0.1.344",
     "react": "^19.1.0",
+    "react-dom": "^19.1.0",
     "ws": "^8.18.3"
   }
 }

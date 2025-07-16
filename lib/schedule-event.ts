@@ -1,5 +1,5 @@
 import Debug from './debug';
-import { Hasyx } from './hasyx';
+import { Hasyx } from 'hasyx/lib/hasyx';
 
 const debug = Debug('schedule-event');
 
