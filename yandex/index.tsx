@@ -21,3 +21,7 @@ export default function YandexMap({ lng, lat, zoom = 10, width = 600, height = 4
     </YMaps>
   );
 }
+
+export class YandexGeoProvider {
+  GeoMap = YandexMap;
+}

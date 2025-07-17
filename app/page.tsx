@@ -1,9 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import YandexMap from "../yandex/index";
-import GoogleMap from "../google/index";
-import TwoGISMap from "../2gis/index";
+import { Geo } from "../lib/index";
 
 const MAP_OPTIONS = [
   { label: "Яндекс", value: "yandex" },
@@ -11,31 +9,18 @@ const MAP_OPTIONS = [
   { label: "2ГИС", value: "2gis" },
 ];
 
-function Map({ engine, params }: { engine: string; params: any }) {
-  switch (engine) {
-    case "yandex":
-      return <YandexMap {...params} />;
-    case "google":
-      return <GoogleMap {...params} />;
-    case "2gis":
-      return <TwoGISMap {...params} />;
-    default:
-      return null;
-  }
-}
-
-function CodeTemplate({ engine, params }: { engine: string; params: any }) {
-  if (!engine) return null;
-  const paramStr = Object.entries(params)
-    .map(([k, v]) => `${k}={${typeof v === 'string' ? `"${v}"` : v}}`)
-    .join(' ');
+function CodeTemplate({ provider, params }: { provider: string; params: any }) {
+  if (!provider) return null;
   let componentName = '';
-  switch (engine) {
+  switch (provider) {
     case 'yandex': componentName = 'YandexMap'; break;
     case 'google': componentName = 'GoogleMap'; break;
     case '2gis': componentName = 'TwoGISMap'; break;
     default: componentName = 'Map';
   }
+  const paramStr = Object.entries(params)
+    .map(([k, v]) => `${k}={${typeof v === 'string' ? `"${v}"` : v}}`)
+    .join(' ');
   return (
     <div className="mt-8 bg-gray-900 text-green-400 p-4 rounded font-mono text-sm overflow-x-auto">
       {`<${componentName} ${paramStr} />`}
@@ -113,13 +98,12 @@ export default function Page() {
       <main className="flex-1 flex items-center justify-center bg-gray-800">
         <div className="w-full max-w-4xl p-8">
           {selected ? (
-            <>
-              <Map engine={selected} params={mapParams} />
-              <CodeTemplate engine={selected} params={mapParams} />
-            </>
+            <Geo provider={selected} {...mapParams}>
+              <CodeTemplate provider={selected} params={mapParams} />
+            </Geo>
           ) : (
             <div className="text-center text-gray-400">
-              <h2 className="text-2xl font-semibold mb-4">Выберите провайдер карт</h2>
+              <h2 className="text-2xl font-semibold mb-4">Выберите провайдера карт</h2>
             </div>
           )}
         </div>

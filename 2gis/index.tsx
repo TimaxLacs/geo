@@ -32,3 +32,7 @@ export default function TwoGISMap({ lng, lat, zoom = 13, width = 600, height = 4
     </div>
   );
 } 
+
+export class TwoGISGeoProvider {
+  GeoMap = TwoGISMap;
+} 
