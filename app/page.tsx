@@ -1,5 +1,8 @@
 "use client";
 
+import { SidebarLayout } from "hasyx/components/sidebar/layout";
+import sidebar from "@/app/sidebar";
+import pckg from "@/package.json";
 import { useState } from "react";
 import { Geo } from "../lib/index";
 
@@ -22,92 +25,77 @@ function CodeTemplate({ provider, params }: { provider: string; params: any }) {
     .map(([k, v]) => `${k}={${typeof v === 'string' ? `"${v}"` : v}}`)
     .join(' ');
   return (
-    <div className="mt-8 bg-gray-900 text-green-400 p-4 rounded font-mono text-sm overflow-x-auto">
+    <div className="mt-4 bg-gray-900 text-green-400 p-4 rounded font-mono text-sm overflow-x-auto">
       {`<${componentName} ${paramStr} />`}
     </div>
   );
 }
 
-function Sidebar({ selected, setSelected, isSidebarCollapsed, setIsSidebarCollapsed }: {
+function ProviderSelector({ selected, setSelected }: {
   selected: string;
   setSelected: (v: string) => void;
-  isSidebarCollapsed: boolean;
-  setIsSidebarCollapsed: (v: boolean) => void;
 }) {
   return (
-    <aside className={`bg-gray-900 border-r border-gray-700 transition-all duration-300 ${
-      isSidebarCollapsed ? 'w-16' : 'w-64'
-    }`}>
-      {/* Заголовок панели */}
-      <div className="p-4 border-b border-gray-700">
-        <div className="flex items-center justify-between">
-          {!isSidebarCollapsed && (
-            <div className="flex items-center space-x-2">
-              <h2 className="font-bold text-lg text-white">Geo</h2>
-            </div>
-          )}
-          <button
-            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-            className="p-1 rounded hover:bg-gray-700"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
-        </div>
-      </div>
-      {/* Выбор провайдера карт */}
-      <div className="p-4">
-        {!isSidebarCollapsed && (
-          <h3 className="font-semibold text-gray-300 mb-3">
-            Провайдер карт
-          </h3>
-        )}
-        <div className="space-y-2">
-          <select
-            className="w-full p-2 rounded bg-gray-800 text-gray-100 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            value={selected}
-            onChange={e => setSelected(e.target.value)}
-          >
-            <option value="">Выберите карту</option>
-            {MAP_OPTIONS.map(option => (
-              <option key={option.value} value={option.value}>{option.label}</option>
-            ))}
-          </select>
-        </div>
-      </div>
-    </aside>
+    <div className="p-4 bg-gray-100 dark:bg-gray-800 rounded-lg">
+      <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">
+        Провайдер карт
+      </h3>
+      <select
+        className="w-full p-2 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        value={selected}
+        onChange={e => setSelected(e.target.value)}
+      >
+        <option value="">Выберите карту</option>
+        {MAP_OPTIONS.map(option => (
+          <option key={option.value} value={option.value}>{option.label}</option>
+        ))}
+      </select>
+    </div>
   );
 }
 
 export default function Page() {
   const [selected, setSelected] = useState<string>("");
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
-  // Все параметры карты в одном объекте
-  const mapParams = { lng: 37.6173, lat: 55.7558, zoom: 13, width: 800, height: 500 };
+  // Параметры карты
+  const mapParams = { lng: 37.6173, lat: 55.7558, zoom: 13, width: 1800, height: 500 };
+  
+  // Определяем, нужно ли перемещать панель наверх при большой ширине карты
+  const isWideMap = mapParams.width > 1200;
 
   return (
-    <div className="flex h-screen">
-      <Sidebar
-        selected={selected}
-        setSelected={setSelected}
-        isSidebarCollapsed={isSidebarCollapsed}
-        setIsSidebarCollapsed={setIsSidebarCollapsed}
-      />
-      <main className="flex-1 flex items-center justify-center bg-gray-800">
-        <div className="w-full max-w-4xl p-8">
-          {selected ? (
-            <Geo provider={selected} {...mapParams}>
-              <CodeTemplate provider={selected} params={mapParams} />
-            </Geo>
-          ) : (
-            <div className="text-center text-gray-400">
-              <h2 className="text-2xl font-semibold mb-4">Выберите провайдера карт</h2>
-            </div>
-          )}
+    <SidebarLayout sidebarData={sidebar} breadcrumb={[{ title: pckg.name, link: '/' }]}>
+      <div className="p-6">
+        {/* Используем гибкую сетку с учетом ширины карты */}
+        <div className={`grid gap-6 ${
+          isWideMap 
+            ? 'grid-cols-1' // При широкой карте - панель сверху
+            : 'grid-cols-1 md:grid-cols-[1fr_300px]' // При обычной карте - панель справа
+        }`}>
+          
+          {/* Основной контент с картой - всегда первый в DOM */}
+          <div>
+            {selected ? (
+              <div className="space-y-4">
+                <Geo provider={selected} {...mapParams} />
+                <CodeTemplate provider={selected} params={mapParams} />
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-96 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                <div className="text-center text-gray-500 dark:text-gray-400">
+                  <h2 className="text-xl font-semibold mb-2">Выберите провайдера карт</h2>
+                  <p>Используйте панель {isWideMap ? 'внизу' : 'справа'} для выбора карты</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Селектор провайдера - справа или снизу в зависимости от ширины */}
+          <div className="w-full">
+            <ProviderSelector selected={selected} setSelected={setSelected} />
+          </div>
         </div>
-      </main>
-    </div>
+      </div>
+    </SidebarLayout>
   );
 }

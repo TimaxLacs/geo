@@ -27,7 +27,7 @@
       "@/*": [
         "./*"
       ],
-      "geo": ["./lib/index.ts"],
+      "geo": ["lib/index.tsx"],
       "geo/*": ["./*"]
     },
     "types": [

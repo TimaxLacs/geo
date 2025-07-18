@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { Map, APIProvider } from '@vis.gl/react-google-maps';
 
 interface GoogleMapProps {
   lng: number;
@@ -10,25 +11,18 @@ interface GoogleMapProps {
 }
 
 export default function GoogleMap({ lng, lat, zoom = 13, width = 600, height = 400, ...rest }: GoogleMapProps) {
-  const mapRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    // Заглушка для Google Maps API
-    console.log('Google Maps API would be loaded here');
-    console.log('Coordinates:', { lng, lat, zoom });
-  }, [lng, lat, zoom]);
+  const mapCenter = { lat, lng };
 
   return (
-    <div 
-      ref={mapRef} 
-      style={{ width, height, backgroundColor: '#f0f0f0', border: '2px solid #ccc', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', color: '#666' }}
-      {...rest}
-    >
-      Google Map (заглушка)
-      <br />
-      Координаты: {lat}, {lng}
-      <br />
-      Зум: {zoom}
+    <div style={{ width, height, borderRadius: '8px', overflow: 'hidden' }} {...rest}>
+      <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''}>
+        <Map
+          zoom={zoom}
+          center={mapCenter}
+          mapId="DEMO_MAP_ID"
+          style={{ width: '100%', height: '100%' }}
+        />
+      </APIProvider>
     </div>
   );
 } 

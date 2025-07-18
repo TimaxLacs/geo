@@ -33,9 +33,10 @@ export interface GeoProps extends GeoMapProps {
 export function Geo(props: GeoProps) {
     const { provider, children, ..._props } = props;
     const _provider = useMemo(() => new classes[provider](), [provider]);
+    const GeoMap = _provider.GeoMap;
     return (
         <GeoContext.Provider value={_provider}>
-            {React.createElement(_provider.GeoMap, _props)}
+            <GeoMap {..._props} />
             {children}
         </GeoContext.Provider>
     );
