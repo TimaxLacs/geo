@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { load } from '@2gis/mapgl';
 
 interface TwoGISMapProps {
   lng: number;
@@ -10,28 +11,59 @@ interface TwoGISMapProps {
 }
 
 export default function TwoGISMap({ lng, lat, zoom = 13, width = 600, height = 400, ...rest }: TwoGISMapProps) {
-  const mapRef = useRef<HTMLDivElement>(null);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const [mapInstance, setMapInstance] = useState<any>(null);
 
   useEffect(() => {
-    // Заглушка для 2GIS API
-    console.log('2GIS API would be loaded here');
-    console.log('Coordinates:', { lng, lat, zoom });
-  }, [lng, lat, zoom]);
+    let map: any = null;
+
+    // Асинхронная загрузка API 2ГИС
+    load().then((mapglAPI) => {
+      // Проверяем, что контейнер существует и карта еще не создана
+      if (mapContainerRef.current && !map) {
+        // Создаем карту с заданными параметрами
+        map = new mapglAPI.Map(mapContainerRef.current, {
+          center: [lng, lat],
+          zoom: zoom,
+          key: process.env.NEXT_PUBLIC_2GIS_API_KEY || '',
+        });
+
+        // Сохраняем экземпляр карты в состоянии
+        setMapInstance(map);
+      }
+    });
+
+    // Очистка при размонтировании компонента
+    return () => {
+      if (mapInstance) {
+        mapInstance.destroy();
+        setMapInstance(null);
+      }
+    };
+  }, []); // Создаем карту только один раз при монтировании
+
+  // Обновляем центр карты при изменении пропсов
+  useEffect(() => {
+    if (mapInstance) {
+      mapInstance.setCenter([lng, lat]);
+    }
+  }, [lng, lat, mapInstance]);
+
+  // Обновляем зум карты при изменении пропсов
+  useEffect(() => {
+    if (mapInstance) {
+      mapInstance.setZoom(zoom);
+    }
+  }, [zoom, mapInstance]);
 
   return (
     <div 
-      ref={mapRef} 
-      style={{ width, height, backgroundColor: '#e8f4f8', border: '2px solid #4a90e2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', color: '#4a90e2' }}
+      ref={mapContainerRef} 
+      style={{ width, height, borderRadius: '8px', overflow: 'hidden' }}
       {...rest}
-    >
-      2ГИС Map (заглушка)
-      <br />
-      Координаты: {lat}, {lng}
-      <br />
-      Зум: {zoom}
-    </div>
+    />
   );
-} 
+}
 
 export class TwoGISGeoProvider {
   GeoMap = TwoGISMap;
