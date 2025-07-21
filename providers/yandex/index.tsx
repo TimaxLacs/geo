@@ -2,6 +2,7 @@
 import { YMaps, Map, useYMaps } from '@pbe/react-yandex-maps';
 import { useEffect, useRef, useState, useContext } from 'react';
 import { GeoContext } from '../../providers/lib/index';
+import { useResizeDetector } from 'react-resize-detector';
 
 interface YandexMapProps {
   lng: number;
@@ -13,15 +14,16 @@ interface YandexMapProps {
 }
 
 // Внутренний компонент, который использует useYMaps
-function YandexMapInner({ lng, lat, zoom = 10, width = 600, height = 400, ...rest }: YandexMapProps) {
+function YandexMapInner({ lng, lat, zoom = 10, ...rest }: Omit<YandexMapProps, 'width' | 'height'>) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const [mapInstance, setMapInstance] = useState<any>(null);
   const ymaps = useYMaps(['Map']);
   const geoProvider = useContext(GeoContext);
+  const { width, height, ref } = useResizeDetector();
 
   useEffect(() => {
     // Проверяем, что ymaps загружен, API готов и контейнер существует
-    if (ymaps && ymaps.Map && mapContainer.current && !mapInstance) {
+    if (ymaps && ymaps.Map && mapContainer.current && !mapInstance && width && height) {
       const map = new ymaps.Map(mapContainer.current, {
         center: [lat, lng],
         zoom,
@@ -40,7 +42,7 @@ function YandexMapInner({ lng, lat, zoom = 10, width = 600, height = 400, ...res
         setMapInstance(null);
       }
     }
-  }, [ymaps, geoProvider]); // Создаем карту только один раз при загрузке API
+  }, [ymaps, geoProvider, width, height]); // Создаем карту только один раз при загрузке API
 
   // Обновляем центр карты при изменении пропсов
   useEffect(() => {
@@ -57,11 +59,14 @@ function YandexMapInner({ lng, lat, zoom = 10, width = 600, height = 400, ...res
   }, [zoom, mapInstance]);
 
   return (
-    <div 
-      ref={mapContainer} 
-      style={{ width, height, borderRadius: '8px', overflow: 'hidden' }}
-        {...rest}
-      />
+    <div style={{ width: '100%', height: '100%', position: 'relative' }} ref={ref} {...rest}>
+      <div style={{ position: 'absolute', width: '100%', height: '100%' }}>
+        <div 
+          ref={mapContainer} 
+          style={{ width: '100%', height: '100%', borderRadius: '8px', overflow: 'hidden' }}
+        />
+      </div>
+    </div>
   );
 }
 

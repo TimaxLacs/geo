@@ -54,13 +54,17 @@ function ProviderSelector({ selected, setSelected }: {
   );
 }
 
-function SettingMapSelector({ onUpdate }: { onUpdate: (params: { lat: number; lng: number; zoom: number }) => void }){
+function SettingMapSelector({ onUpdate }: { 
+  onUpdate: (params: { lat: number; lng: number; zoom: number; width: number; height: number }) => void;
+}){
   const [zoom, setZoom] = useState(13);
   const [lat, setLat] = useState(55.7558);
   const [lng, setLng] = useState(37.6173);
+  const [width, setWidth] = useState(800);
+  const [height, setHeight] = useState(500);
   
   const handleUpdate = () => {
-    onUpdate({ lat, lng, zoom });
+    onUpdate({ lat, lng, zoom, width, height });
   };
   
   return(
@@ -109,9 +113,46 @@ function SettingMapSelector({ onUpdate }: { onUpdate: (params: { lat: number; ln
             className="w-full p-2 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
             placeholder="13"
           />
-                  </div>
+        </div>
       </div>
-      <button
+      
+      <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-3 mt-4">
+        Размеры карты
+      </h3>
+      <div className="grid grid-cols-2 gap-3 mb-3">
+        <div>
+          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Ширина (px)
+          </label>
+          <input
+            type="number"
+            step="50"
+            min="200"
+            max="2000"
+            value={width}
+            onChange={(e) => setWidth(Number(e.target.value))}
+            className="w-full p-2 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+            placeholder="800"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Высота (px)
+          </label>
+          <input
+            type="number"
+            step="50"
+            min="200"
+            max="1500"
+            value={height}
+            onChange={(e) => setHeight(Number(e.target.value))}
+            className="w-full p-2 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+            placeholder="500"
+          />
+        </div>
+      </div>
+      
+            <button
         onClick={handleUpdate}
         className="w-full bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded transition-colors"
       >
@@ -124,16 +165,21 @@ function SettingMapSelector({ onUpdate }: { onUpdate: (params: { lat: number; ln
 export default function Page() {
   const [selected, setSelected] = useState<string>("");
   const geoRef = useRef<GeoImperativeHandle>(null);
+  const [mapSize, setMapSize] = useState({ width: 800, height: 500 });
 
   // Параметры карты
-  const mapParams = { lng: 37.6173, lat: 55.7558, zoom: 13, width: 800, height: 500 };
+  const mapParams = { lng: 37.6173, lat: 55.7558, zoom: 13, width: mapSize.width, height: mapSize.height };
   
   // Определяем, нужно ли перемещать панель наверх при большой ширине карты
   const isWideMap = mapParams.width > 1200;
   
-  const handleMapUpdate = (params: { lat: number; lng: number; zoom: number }) => {
+  const handleMapUpdate = (params: { lat: number; lng: number; zoom: number; width: number; height: number }) => {
+    // Обновляем размеры карты
+    setMapSize({ width: params.width, height: params.height });
+    
+    // Обновляем позицию карты
     if (geoRef.current) {
-      geoRef.current.updateMap(params);
+      geoRef.current.updateMap({ lat: params.lat, lng: params.lng, zoom: params.zoom });
     }
   };
 
@@ -148,14 +194,21 @@ export default function Page() {
         }`}>
           
           {/* Основной контент с картой - всегда первый в DOM */}
-          <div>
+          <div style={{ width: '100%', height: '100%', position: 'relative' }}>
             {selected ? (
               <div className="space-y-4">
-                <Geo ref={geoRef} provider={selected} {...mapParams} />
+                <div style={{ width: mapSize.width + 'px', height: mapSize.height + 'px', border: '2px solid #e5e7eb', borderRadius: '8px' }}>
+                  <Geo 
+                    key={`${selected}-${mapSize.width}-${mapSize.height}`}
+                    ref={geoRef} 
+                    provider={selected} 
+                    {...mapParams} 
+                  />
+                </div>
                 <CodeTemplate provider={selected} params={mapParams} />
               </div>
             ) : (
-              <div className="flex items-center justify-center h-96 bg-gray-100 dark:bg-gray-800 rounded-lg">
+              <div className="flex items-center justify-center h-96 bg-gray-100 dark:bg-gray-800 rounded-lg" style={{ width: '100%', height: '100%' }}>
                 <div className="text-center text-gray-500 dark:text-gray-400">
                   <h2 className="text-xl font-semibold mb-2">Выберите провайдера карт</h2>
                   <p>Используйте панель {isWideMap ? 'внизу' : 'справа'} для выбора карты</p>

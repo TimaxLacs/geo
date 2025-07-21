@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useContext } from 'react';
 import { Map, APIProvider, useMap } from '@vis.gl/react-google-maps';
 import { GeoContext } from '../../providers/lib/index';
+import { useResizeDetector } from 'react-resize-detector';
 
 interface GoogleMapProps {
   lng: number;
@@ -40,19 +41,25 @@ function GoogleMapInner({ lng, lat, zoom = 13 }: { lng: number; lat: number; zoo
   return null; // Этот компонент не рендерит ничего, только управляет картой
 }
 
-export default function GoogleMap({ lng, lat, zoom = 13, width = 600, height = 400, ...rest }: GoogleMapProps) {
+export default function GoogleMap({ lng, lat, zoom = 13, ...rest }: GoogleMapProps) {
+  const { width, height, ref } = useResizeDetector();
+
   return (
-    <div style={{ width, height, borderRadius: '8px', overflow: 'hidden' }} {...rest}>
-      <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''}>
-        <Map
-          defaultCenter={{ lat, lng }}
-          defaultZoom={zoom}
-          mapId="DEMO_MAP_ID"
-          style={{ width: '100%', height: '100%' }}
-        >
-          <GoogleMapInner lng={lng} lat={lat} zoom={zoom} />
-        </Map>
-      </APIProvider>
+    <div style={{ width: '100%', height: '100%', position: 'relative' }} ref={ref} {...rest}>
+      <div style={{ position: 'absolute', width: '100%', height: '100%' }}>
+        <div style={{ width: '100%', height: '100%', borderRadius: '8px', overflow: 'hidden' }}>
+          <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''}>
+            <Map
+              defaultCenter={{ lat, lng }}
+              defaultZoom={zoom}
+              mapId="DEMO_MAP_ID"
+              style={{ width: '100%', height: '100%' }}
+            >
+              <GoogleMapInner lng={lng} lat={lat} zoom={zoom} />
+            </Map>
+          </APIProvider>
+        </div>
+      </div>
     </div>
   );
 } 
