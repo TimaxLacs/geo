@@ -14,7 +14,7 @@ interface YandexMapProps {
 }
 
 // Внутренний компонент, который использует useYMaps
-function YandexMapInner({ lng, lat, zoom = 10, onPosition, isMouseDownRef, ...rest }: Omit<YandexMapProps, 'width' | 'height'>) {
+function YandexMapInner({ lng, lat, zoom = 10, onPosition, ...rest }: Omit<YandexMapProps, 'width' | 'height'>) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const [mapInstance, setMapInstance] = useState<any>(null);
   const ymaps = useYMaps(['Map']);
@@ -30,7 +30,7 @@ function YandexMapInner({ lng, lat, zoom = 10, onPosition, isMouseDownRef, ...re
       });
       setMapInstance(map);
       
-      // Добавляем обработчики событий для отслеживания изменений
+      // Простой обработчик изменения позиции - только для обновления инпутов
       if (onPosition) {
         map.events.add(['boundschange'], () => {
           const center = map.getCenter();
@@ -55,23 +55,23 @@ function YandexMapInner({ lng, lat, zoom = 10, onPosition, isMouseDownRef, ...re
         setMapInstance(null);
       }
     }
-  }, [ymaps, geoProvider, width, height, onPosition]); // Создаем карту только один раз при загрузке API
+  }, [ymaps, geoProvider, width, height]); // Создаем карту только один раз при загрузке API
 
-  // Обновляем центр карты при изменении пропсов (только если мышь не зажата)
+  // Обновляем центр карты при изменении пропсов (теперь всегда можно обновлять)
   useEffect(() => {
-    if (mapInstance && (!isMouseDownRef || !isMouseDownRef.current)) {
+    if (mapInstance) {
       console.log('Yandex: Обновляем центр карты', { lat, lng });
       mapInstance.setCenter([lat, lng]);
     }
-  }, [lat, lng, mapInstance, isMouseDownRef]);
+  }, [lat, lng, mapInstance]);
 
-  // Обновляем зум карты при изменении пропсов (только если мышь не зажата)
+  // Обновляем зум карты при изменении пропсов (теперь всегда можно обновлять)
   useEffect(() => {
-    if (mapInstance && (!isMouseDownRef || !isMouseDownRef.current)) {
+    if (mapInstance) {
       console.log('Yandex: Обновляем зум карты', zoom);
       mapInstance.setZoom(zoom);
     }
-  }, [zoom, mapInstance, isMouseDownRef]);
+  }, [zoom, mapInstance]);
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }} ref={ref} {...rest}>

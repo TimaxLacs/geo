@@ -13,12 +13,11 @@ interface GoogleMapProps {
 }
 
 // Внутренний компонент, который использует useMap
-function GoogleMapInner({ lng, lat, zoom = 13, onPosition, isMouseDownRef }: { 
+function GoogleMapInner({ lng, lat, zoom = 13, onPosition }: { 
   lng: number; 
   lat: number; 
   zoom?: number; 
   onPosition?: (position: { lat: number; lng: number; zoom: number }) => void;
-  isMouseDownRef?: React.MutableRefObject<boolean>;
 }) {
   const map = useMap();
   const geoProvider = useContext(GeoContext);
@@ -30,10 +29,10 @@ function GoogleMapInner({ lng, lat, zoom = 13, onPosition, isMouseDownRef }: {
     }
   }, [map, geoProvider]);
 
-  // Добавляем обработчики событий для отслеживания изменений
+  // Простой обработчик изменения позиции - только для обновления инпутов
   useEffect(() => {
     if (map && onPosition) {
-      const handleChange = () => {
+      const handlePositionChange = () => {
         const center = map.getCenter();
         const currentZoom = map.getZoom();
         if (center) {
@@ -46,8 +45,8 @@ function GoogleMapInner({ lng, lat, zoom = 13, onPosition, isMouseDownRef }: {
       };
 
       const listeners = [
-        map.addListener('dragend', handleChange),
-        map.addListener('zoom_changed', handleChange)
+        map.addListener('dragend', handlePositionChange),
+        map.addListener('zoom_changed', handlePositionChange)
       ];
 
       return () => {
@@ -60,26 +59,26 @@ function GoogleMapInner({ lng, lat, zoom = 13, onPosition, isMouseDownRef }: {
     }
   }, [map, onPosition, zoom]);
 
-  // Обновляем центр карты при изменении пропсов (только если мышь не зажата)
+  // Обновляем центр карты при изменении пропсов (теперь всегда можно обновлять)
   useEffect(() => {
-    if (map && (!isMouseDownRef || !isMouseDownRef.current)) {
+    if (map) {
       console.log('Google: Обновляем центр карты', { lat, lng });
       map.setCenter({ lat, lng });
     }
-  }, [lat, lng, map, isMouseDownRef]);
+  }, [lat, lng, map]);
 
-  // Обновляем зум карты при изменении пропсов (только если мышь не зажата)
+  // Обновляем зум карты при изменении пропсов (теперь всегда можно обновлять)
   useEffect(() => {
-    if (map && (!isMouseDownRef || !isMouseDownRef.current)) {
+    if (map) {
       console.log('Google: Обновляем зум карты', zoom);
       map.setZoom(zoom);
     }
-  }, [zoom, map, isMouseDownRef]);
+  }, [zoom, map]);
 
   return null; // Этот компонент не рендерит ничего, только управляет картой
 }
 
-export default function GoogleMap({ lng, lat, zoom = 13, onPosition, isMouseDownRef, ...rest }: GoogleMapProps) {
+export default function GoogleMap({ lng, lat, zoom = 13, onPosition, ...rest }: GoogleMapProps) {
   const { width, height, ref } = useResizeDetector();
 
   return (
@@ -93,7 +92,7 @@ export default function GoogleMap({ lng, lat, zoom = 13, onPosition, isMouseDown
               mapId="DEMO_MAP_ID"
               style={{ width: '100%', height: '100%' }}
             >
-              <GoogleMapInner lng={lng} lat={lat} zoom={zoom} onPosition={onPosition} isMouseDownRef={isMouseDownRef} />
+              <GoogleMapInner lng={lng} lat={lat} zoom={zoom} onPosition={onPosition} />
             </Map>
           </APIProvider>
         </div>

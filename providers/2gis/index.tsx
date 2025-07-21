@@ -12,7 +12,7 @@ interface TwoGISMapProps {
   [key: string]: any;
 }
 
-export default function TwoGISMap({ lng, lat, zoom = 13, onPosition, isMouseDownRef, ...rest }: TwoGISMapProps) {
+export default function TwoGISMap({ lng, lat, zoom = 13, onPosition, ...rest }: TwoGISMapProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const [mapInstance, setMapInstance] = useState<any>(null);
   const geoProvider = useContext(GeoContext);
@@ -36,9 +36,19 @@ export default function TwoGISMap({ lng, lat, zoom = 13, onPosition, isMouseDown
           // Сохраняем экземпляр карты в состоянии
           setMapInstance(map);
           
-          // Добавляем обработчики событий для отслеживания изменений
+          // Простой обработчик изменения позиции - только для обновления инпутов
           if (onPosition) {
             map.on('moveend', () => {
+              const center = map.getCenter();
+              const currentZoom = map.getZoom();
+              onPosition({
+                lat: center[1],
+                lng: center[0],
+                zoom: currentZoom
+              });
+            });
+            
+            map.on('zoomend', () => {
               const center = map.getCenter();
               const currentZoom = map.getZoom();
               onPosition({
@@ -64,23 +74,23 @@ export default function TwoGISMap({ lng, lat, zoom = 13, onPosition, isMouseDown
         setMapInstance(null);
       }
     };
-  }, [geoProvider, width, height]); // Создаем карту только один раз при монтировании
+  }, [width, height]); // Создаем карту при изменении размеров
 
-  // Обновляем центр карты при изменении пропсов (только если мышь не зажата)
+  // Обновляем центр карты при изменении пропсов (теперь всегда можно обновлять)
   useEffect(() => {
-    if (mapInstance && (!isMouseDownRef || !isMouseDownRef.current)) {
+    if (mapInstance) {
       console.log('2GIS: Обновляем центр карты', { lat, lng });
       mapInstance.setCenter([lng, lat]);
     }
-  }, [lng, lat, mapInstance, isMouseDownRef]);
+  }, [lng, lat, mapInstance]);
 
-  // Обновляем зум карты при изменении пропсов (только если мышь не зажата)
+  // Обновляем зум карты при изменении пропсов (теперь всегда можно обновлять)
   useEffect(() => {
-    if (mapInstance && (!isMouseDownRef || !isMouseDownRef.current)) {
+    if (mapInstance) {
       console.log('2GIS: Обновляем зум карты', zoom);
       mapInstance.setZoom(zoom);
     }
-  }, [zoom, mapInstance, isMouseDownRef]);
+  }, [zoom, mapInstance]);
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }} ref={ref} {...rest}>

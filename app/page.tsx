@@ -174,53 +174,45 @@ export default function Page() {
   const [selected, setSelected] = useState<string>("");
   const geoRef = useRef<GeoImperativeHandle>(null);
   const [mapSize, setMapSize] = useState({ width: 800, height: 500 });
-  const [currentPosition, setCurrentPosition] = useState({ lat: 55.7558, lng: 37.6173, zoom: 13 });
+  
+  // Два отдельных состояния для разделения источников
+  const [inputPosition, setInputPosition] = useState({ lat: 55.7558, lng: 37.6173, zoom: 13 }); // Обновляется от карты
+  const [mapPosition, setMapPosition] = useState({ lat: 55.7558, lng: 37.6173, zoom: 13 }); // Обновляется от инпутов
+  
   const [mapKey, setMapKey] = useState(0);
 
-  // Параметры карты
-  const mapParams = { lng: currentPosition.lng, lat: currentPosition.lat, zoom: currentPosition.zoom, width: mapSize.width, height: mapSize.height };
+  // Параметры карты берутся из mapPosition (не из inputPosition!)
+  const mapParams = { lng: mapPosition.lng, lat: mapPosition.lat, zoom: mapPosition.zoom, width: mapSize.width, height: mapSize.height };
   
   // Определяем, нужно ли перемещать панель наверх при большой ширине карты
   const isWideMap = mapParams.width > 1200;
   
   const handleMapUpdate = (params: { lat: number; lng: number; zoom: number; width: number; height: number }) => {
+    console.log('handleMapUpdate called (от инпутов):', params);
+    
     // Проверяем, изменились ли размеры
     const sizeChanged = mapSize.width !== params.width || mapSize.height !== params.height;
     
     // Обновляем размеры карты
     setMapSize({ width: params.width, height: params.height });
     
-    // Обновляем текущую позицию
-    setCurrentPosition({ lat: params.lat, lng: params.lng, zoom: params.zoom });
+    // Обновляем позицию карты (карта получит новые пропсы)
+    setMapPosition({ lat: params.lat, lng: params.lng, zoom: params.zoom });
+    
+    // Синхронизируем инпуты
+    setInputPosition({ lat: params.lat, lng: params.lng, zoom: params.zoom });
     
     // Если размеры изменились, принудительно перерендерим карту
     if (sizeChanged) {
       setMapKey(prev => prev + 1);
-    } else {
-      // Иначе просто обновляем позицию карты
-      if (geoRef.current) {
-        geoRef.current.updateMap({ lat: params.lat, lng: params.lng, zoom: params.zoom });
-      }
     }
   };
-  
-  const isMouseDownRef = useRef<boolean>(false);
   
   const handlePositionChange = (position: { lat: number; lng: number; zoom: number }) => {
-    // Обновляем позицию только если мышка не зажата (пользователь не двигает карту)
-    if (!isMouseDownRef.current) {
-      setCurrentPosition(position);
-    }
-  };
-  
-  const handleMouseDown = () => {
-    isMouseDownRef.current = true;
-    console.log('Mouse down - карта в режиме перетаскивания');
-  };
-  
-  const handleMouseUp = () => {
-    isMouseDownRef.current = false;
-    console.log('Mouse up - карта свободна для обновлений');
+    console.log('handlePositionChange called (от драга карты):', position);
+    
+    // От драга карты - обновляем ТОЛЬКО инпуты, карту НЕ трогаем!
+    setInputPosition(position);
   };
 
   return (
@@ -239,16 +231,12 @@ export default function Page() {
               <div className="space-y-4">
                 <div 
                   style={{ width: mapSize.width + 'px', height: mapSize.height + 'px', border: '2px solid #e5e7eb', borderRadius: '8px' }}
-                  onMouseDown={handleMouseDown}
-                  onMouseUp={handleMouseUp}
-                  onMouseLeave={handleMouseUp}
                 >
                   <Geo 
                     key={`${selected}-${mapKey}`}
                     ref={geoRef} 
                     provider={selected} 
                     onPosition={handlePositionChange}
-                    isMouseDownRef={isMouseDownRef}
                     {...mapParams} 
                   />
                 </div>
@@ -268,7 +256,8 @@ export default function Page() {
           <div className="w-full">
             <div className="p-4 bg-gray-100 dark:bg-gray-800 rounded-lg"> 
               <ProviderSelector selected={selected} setSelected={setSelected} />
-              <SettingMapSelector onUpdate={handleMapUpdate} position={currentPosition}/>
+              {/* Передаем inputPosition в панель (показываем актуальные координаты от карты) */}
+              <SettingMapSelector onUpdate={handleMapUpdate} position={inputPosition}/>
               </div>
           </div>
         </div>

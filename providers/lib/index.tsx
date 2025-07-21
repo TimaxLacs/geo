@@ -10,7 +10,6 @@ export interface GeoMapProps {
     width?: number | string;
     height?: number | string;
     onPosition?: (position: { lat: number; lng: number; zoom: number }) => void;
-    isMouseDownRef?: React.MutableRefObject<boolean>;
 }
 
 export interface GeoProvider {
