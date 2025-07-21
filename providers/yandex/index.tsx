@@ -14,7 +14,7 @@ interface YandexMapProps {
 }
 
 // Внутренний компонент, который использует useYMaps
-function YandexMapInner({ lng, lat, zoom = 10, ...rest }: Omit<YandexMapProps, 'width' | 'height'>) {
+function YandexMapInner({ lng, lat, zoom = 10, onPosition, isMouseDownRef, ...rest }: Omit<YandexMapProps, 'width' | 'height'>) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const [mapInstance, setMapInstance] = useState<any>(null);
   const ymaps = useYMaps(['Map']);
@@ -30,6 +30,19 @@ function YandexMapInner({ lng, lat, zoom = 10, ...rest }: Omit<YandexMapProps, '
       });
       setMapInstance(map);
       
+      // Добавляем обработчики событий для отслеживания изменений
+      if (onPosition) {
+        map.events.add(['boundschange'], () => {
+          const center = map.getCenter();
+          const currentZoom = map.getZoom();
+          onPosition({
+            lat: center[0],
+            lng: center[1],
+            zoom: currentZoom
+          });
+        });
+      }
+      
       // Передаем экземпляр карты в провайдер
       if (geoProvider && (geoProvider as any).setMapInstance) {
         (geoProvider as any).setMapInstance(map);
@@ -42,21 +55,23 @@ function YandexMapInner({ lng, lat, zoom = 10, ...rest }: Omit<YandexMapProps, '
         setMapInstance(null);
       }
     }
-  }, [ymaps, geoProvider, width, height]); // Создаем карту только один раз при загрузке API
+  }, [ymaps, geoProvider, width, height, onPosition]); // Создаем карту только один раз при загрузке API
 
-  // Обновляем центр карты при изменении пропсов
+  // Обновляем центр карты при изменении пропсов (только если мышь не зажата)
   useEffect(() => {
-    if (mapInstance) {
+    if (mapInstance && (!isMouseDownRef || !isMouseDownRef.current)) {
+      console.log('Yandex: Обновляем центр карты', { lat, lng });
       mapInstance.setCenter([lat, lng]);
     }
-  }, [lat, lng, mapInstance]);
+  }, [lat, lng, mapInstance, isMouseDownRef]);
 
-  // Обновляем зум карты при изменении пропсов
+  // Обновляем зум карты при изменении пропсов (только если мышь не зажата)
   useEffect(() => {
-    if (mapInstance) {
+    if (mapInstance && (!isMouseDownRef || !isMouseDownRef.current)) {
+      console.log('Yandex: Обновляем зум карты', zoom);
       mapInstance.setZoom(zoom);
     }
-  }, [zoom, mapInstance]);
+  }, [zoom, mapInstance, isMouseDownRef]);
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }} ref={ref} {...rest}>

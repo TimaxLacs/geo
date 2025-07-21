@@ -9,14 +9,23 @@ export interface GeoMapProps {
     zoom?: number;
     width?: number | string;
     height?: number | string;
+    onPosition?: (position: { lat: number; lng: number; zoom: number }) => void;
+    isMouseDownRef?: React.MutableRefObject<boolean>;
 }
 
 export interface GeoProvider {
     GeoMap: React.ComponentType<GeoMapProps>;
-
+    // Императивные методы для обновления карты
     setCenter?: (lat: number, lng: number) => void;
-    setZoom?: (zoom:number) => void;
+    setZoom?: (zoom: number) => void;
     updateMap?: (params: Partial<GeoMapProps>) => void;
+}
+
+// Интерфейс для императивного API
+export interface GeoImperativeHandle {
+    setCenter: (lat: number, lng: number) => void;
+    setZoom: (zoom: number) => void;
+    updateMap: (params: Partial<GeoMapProps>) => void;
 }
 
 export const GeoContext = createContext<GeoProvider | undefined>(undefined);
@@ -31,12 +40,6 @@ const classes: Record<string, any> = {
 export interface GeoProps extends GeoMapProps {
     provider: string;
     children?: React.ReactNode;
-}
-
-export interface GeoImperativeHandle {
-    setCenter: (lat: number, lng: number) => void;
-    setZoom: (zoom: number) => void;
-    updateMap: (params: Partial<GeoMapProps>) => void;
 }
 
 export const Geo = forwardRef<GeoImperativeHandle, GeoProps>((props, ref) => {

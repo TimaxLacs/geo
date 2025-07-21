@@ -3,7 +3,7 @@
 import { SidebarLayout } from "hasyx/components/sidebar/layout";
 import sidebar from "@/app/sidebar";
 import pckg from "@/package.json";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Geo, GeoImperativeHandle } from "../providers/lib/index";
 
 const MAP_OPTIONS = [
@@ -54,14 +54,22 @@ function ProviderSelector({ selected, setSelected }: {
   );
 }
 
-function SettingMapSelector({ onUpdate }: { 
+function SettingMapSelector({ onUpdate, position }: { 
   onUpdate: (params: { lat: number; lng: number; zoom: number; width: number; height: number }) => void;
+  position: { lat: number; lng: number; zoom: number };
 }){
   const [zoom, setZoom] = useState(13);
   const [lat, setLat] = useState(55.7558);
   const [lng, setLng] = useState(37.6173);
   const [width, setWidth] = useState(800);
   const [height, setHeight] = useState(500);
+  
+  // Синхронизируем инпуты с позицией карты
+  useEffect(() => {
+    setLat(position.lat);
+    setLng(position.lng);
+    setZoom(position.zoom);
+  }, [position]);
   
   const handleUpdate = () => {
     onUpdate({ lat, lng, zoom, width, height });
@@ -166,21 +174,53 @@ export default function Page() {
   const [selected, setSelected] = useState<string>("");
   const geoRef = useRef<GeoImperativeHandle>(null);
   const [mapSize, setMapSize] = useState({ width: 800, height: 500 });
+  const [currentPosition, setCurrentPosition] = useState({ lat: 55.7558, lng: 37.6173, zoom: 13 });
+  const [mapKey, setMapKey] = useState(0);
 
   // Параметры карты
-  const mapParams = { lng: 37.6173, lat: 55.7558, zoom: 13, width: mapSize.width, height: mapSize.height };
+  const mapParams = { lng: currentPosition.lng, lat: currentPosition.lat, zoom: currentPosition.zoom, width: mapSize.width, height: mapSize.height };
   
   // Определяем, нужно ли перемещать панель наверх при большой ширине карты
   const isWideMap = mapParams.width > 1200;
   
   const handleMapUpdate = (params: { lat: number; lng: number; zoom: number; width: number; height: number }) => {
+    // Проверяем, изменились ли размеры
+    const sizeChanged = mapSize.width !== params.width || mapSize.height !== params.height;
+    
     // Обновляем размеры карты
     setMapSize({ width: params.width, height: params.height });
     
-    // Обновляем позицию карты
-    if (geoRef.current) {
-      geoRef.current.updateMap({ lat: params.lat, lng: params.lng, zoom: params.zoom });
+    // Обновляем текущую позицию
+    setCurrentPosition({ lat: params.lat, lng: params.lng, zoom: params.zoom });
+    
+    // Если размеры изменились, принудительно перерендерим карту
+    if (sizeChanged) {
+      setMapKey(prev => prev + 1);
+    } else {
+      // Иначе просто обновляем позицию карты
+      if (geoRef.current) {
+        geoRef.current.updateMap({ lat: params.lat, lng: params.lng, zoom: params.zoom });
+      }
     }
+  };
+  
+  const isMouseDownRef = useRef<boolean>(false);
+  
+  const handlePositionChange = (position: { lat: number; lng: number; zoom: number }) => {
+    // Обновляем позицию только если мышка не зажата (пользователь не двигает карту)
+    if (!isMouseDownRef.current) {
+      setCurrentPosition(position);
+    }
+  };
+  
+  const handleMouseDown = () => {
+    isMouseDownRef.current = true;
+    console.log('Mouse down - карта в режиме перетаскивания');
+  };
+  
+  const handleMouseUp = () => {
+    isMouseDownRef.current = false;
+    console.log('Mouse up - карта свободна для обновлений');
   };
 
   return (
@@ -197,11 +237,18 @@ export default function Page() {
           <div style={{ width: '100%', height: '100%', position: 'relative' }}>
             {selected ? (
               <div className="space-y-4">
-                <div style={{ width: mapSize.width + 'px', height: mapSize.height + 'px', border: '2px solid #e5e7eb', borderRadius: '8px' }}>
+                <div 
+                  style={{ width: mapSize.width + 'px', height: mapSize.height + 'px', border: '2px solid #e5e7eb', borderRadius: '8px' }}
+                  onMouseDown={handleMouseDown}
+                  onMouseUp={handleMouseUp}
+                  onMouseLeave={handleMouseUp}
+                >
                   <Geo 
-                    key={`${selected}-${mapSize.width}-${mapSize.height}`}
+                    key={`${selected}-${mapKey}`}
                     ref={geoRef} 
                     provider={selected} 
+                    onPosition={handlePositionChange}
+                    isMouseDownRef={isMouseDownRef}
                     {...mapParams} 
                   />
                 </div>
@@ -221,7 +268,7 @@ export default function Page() {
           <div className="w-full">
             <div className="p-4 bg-gray-100 dark:bg-gray-800 rounded-lg"> 
               <ProviderSelector selected={selected} setSelected={setSelected} />
-              <SettingMapSelector onUpdate={handleMapUpdate}/>
+              <SettingMapSelector onUpdate={handleMapUpdate} position={currentPosition}/>
               </div>
           </div>
         </div>
