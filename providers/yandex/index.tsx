@@ -1,6 +1,7 @@
 /// <reference types="yandex-maps" />
 import { YMaps, Map, useYMaps } from '@pbe/react-yandex-maps';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useContext } from 'react';
+import { GeoContext } from '../../providers/lib/index';
 
 interface YandexMapProps {
   lng: number;
@@ -16,6 +17,7 @@ function YandexMapInner({ lng, lat, zoom = 10, width = 600, height = 400, ...res
   const mapContainer = useRef<HTMLDivElement>(null);
   const [mapInstance, setMapInstance] = useState<any>(null);
   const ymaps = useYMaps(['Map']);
+  const geoProvider = useContext(GeoContext);
 
   useEffect(() => {
     // Проверяем, что ymaps загружен, API готов и контейнер существует
@@ -25,6 +27,11 @@ function YandexMapInner({ lng, lat, zoom = 10, width = 600, height = 400, ...res
         zoom,
       });
       setMapInstance(map);
+      
+      // Передаем экземпляр карты в провайдер
+      if (geoProvider && (geoProvider as any).setMapInstance) {
+        (geoProvider as any).setMapInstance(map);
+      }
     }
 
     return () => {
@@ -33,7 +40,7 @@ function YandexMapInner({ lng, lat, zoom = 10, width = 600, height = 400, ...res
         setMapInstance(null);
       }
     }
-  }, [ymaps]); // Создаем карту только один раз при загрузке API
+  }, [ymaps, geoProvider]); // Создаем карту только один раз при загрузке API
 
   // Обновляем центр карты при изменении пропсов
   useEffect(() => {
@@ -53,8 +60,8 @@ function YandexMapInner({ lng, lat, zoom = 10, width = 600, height = 400, ...res
     <div 
       ref={mapContainer} 
       style={{ width, height, borderRadius: '8px', overflow: 'hidden' }}
-      {...rest}
-    />
+        {...rest}
+      />
   );
 }
 
@@ -73,5 +80,36 @@ export default function YandexMap(props: YandexMapProps) {
 }
 
 export class YandexGeoProvider {
+  private mapInstance: any = null;
+  
   GeoMap = YandexMap;
+  
+  // Императивные методы для обновления карты
+  setCenter = (lat: number, lng: number) => {
+    if (this.mapInstance) {
+      this.mapInstance.setCenter([lat, lng]);
+    }
+  };
+  
+  setZoom = (zoom: number) => {
+    if (this.mapInstance) {
+      this.mapInstance.setZoom(zoom);
+    }
+  };
+  
+  updateMap = (params: any) => {
+    if (this.mapInstance) {
+      if (params.lat !== undefined && params.lng !== undefined) {
+        this.mapInstance.setCenter([params.lat, params.lng]);
+      }
+      if (params.zoom !== undefined) {
+        this.mapInstance.setZoom(params.zoom);
+      }
+    }
+  };
+  
+  // Метод для установки экземпляра карты
+  setMapInstance = (instance: any) => {
+    this.mapInstance = instance;
+  };
 }

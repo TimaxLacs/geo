@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useContext } from 'react';
 import { Map, APIProvider, useMap } from '@vis.gl/react-google-maps';
+import { GeoContext } from '../../providers/lib/index';
 
 interface GoogleMapProps {
   lng: number;
@@ -13,6 +14,14 @@ interface GoogleMapProps {
 // Внутренний компонент, который использует useMap
 function GoogleMapInner({ lng, lat, zoom = 13 }: { lng: number; lat: number; zoom?: number }) {
   const map = useMap();
+  const geoProvider = useContext(GeoContext);
+
+  // Передаем экземпляр карты в провайдер при первом рендере
+  useEffect(() => {
+    if (map && geoProvider && (geoProvider as any).setMapInstance) {
+      (geoProvider as any).setMapInstance(map);
+    }
+  }, [map, geoProvider]);
 
   // Обновляем центр карты при изменении пропсов
   useEffect(() => {
@@ -49,5 +58,36 @@ export default function GoogleMap({ lng, lat, zoom = 13, width = 600, height = 4
 } 
 
 export class GoogleGeoProvider {
+  private mapInstance: any = null;
+  
   GeoMap = GoogleMap;
+  
+  // Императивные методы для обновления карты
+  setCenter = (lat: number, lng: number) => {
+    if (this.mapInstance) {
+      this.mapInstance.setCenter({ lat, lng });
+    }
+  };
+  
+  setZoom = (zoom: number) => {
+    if (this.mapInstance) {
+      this.mapInstance.setZoom(zoom);
+    }
+  };
+  
+  updateMap = (params: any) => {
+    if (this.mapInstance) {
+      if (params.lat !== undefined && params.lng !== undefined) {
+        this.mapInstance.setCenter({ lat: params.lat, lng: params.lng });
+      }
+      if (params.zoom !== undefined) {
+        this.mapInstance.setZoom(params.zoom);
+      }
+    }
+  };
+  
+  // Метод для установки экземпляра карты
+  setMapInstance = (instance: any) => {
+    this.mapInstance = instance;
+  };
 } 

@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useContext } from 'react';
 import { load } from '@2gis/mapgl';
+import { GeoContext } from '../../providers/lib/index';
 
 interface TwoGISMapProps {
   lng: number;
@@ -13,6 +14,7 @@ interface TwoGISMapProps {
 export default function TwoGISMap({ lng, lat, zoom = 13, width = 600, height = 400, ...rest }: TwoGISMapProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const [mapInstance, setMapInstance] = useState<any>(null);
+  const geoProvider = useContext(GeoContext);
 
   useEffect(() => {
     let map: any = null;
@@ -30,6 +32,11 @@ export default function TwoGISMap({ lng, lat, zoom = 13, width = 600, height = 4
 
         // Сохраняем экземпляр карты в состоянии
         setMapInstance(map);
+        
+        // Передаем экземпляр карты в провайдер
+        if (geoProvider && (geoProvider as any).setMapInstance) {
+          (geoProvider as any).setMapInstance(map);
+        }
       }
     });
 
@@ -40,7 +47,7 @@ export default function TwoGISMap({ lng, lat, zoom = 13, width = 600, height = 4
         setMapInstance(null);
       }
     };
-  }, []); // Создаем карту только один раз при монтировании
+  }, [geoProvider]); // Создаем карту только один раз при монтировании
 
   // Обновляем центр карты при изменении пропсов
   useEffect(() => {
@@ -66,5 +73,36 @@ export default function TwoGISMap({ lng, lat, zoom = 13, width = 600, height = 4
 }
 
 export class TwoGISGeoProvider {
+  private mapInstance: any = null;
+  
   GeoMap = TwoGISMap;
+  
+  // Императивные методы для обновления карты
+  setCenter = (lat: number, lng: number) => {
+    if (this.mapInstance) {
+      this.mapInstance.setCenter([lng, lat]);
+    }
+  };
+  
+  setZoom = (zoom: number) => {
+    if (this.mapInstance) {
+      this.mapInstance.setZoom(zoom);
+    }
+  };
+  
+  updateMap = (params: any) => {
+    if (this.mapInstance) {
+      if (params.lat !== undefined && params.lng !== undefined) {
+        this.mapInstance.setCenter([params.lng, params.lat]);
+      }
+      if (params.zoom !== undefined) {
+        this.mapInstance.setZoom(params.zoom);
+      }
+    }
+  };
+  
+  // Метод для установки экземпляра карты
+  setMapInstance = (instance: any) => {
+    this.mapInstance = instance;
+  };
 } 

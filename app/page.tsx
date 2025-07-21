@@ -3,8 +3,8 @@
 import { SidebarLayout } from "hasyx/components/sidebar/layout";
 import sidebar from "@/app/sidebar";
 import pckg from "@/package.json";
-import { useState } from "react";
-import { Geo } from "../lib/index";
+import { useState, useRef } from "react";
+import { Geo, GeoImperativeHandle } from "../providers/lib/index";
 
 const MAP_OPTIONS = [
   { label: "Яндекс", value: "yandex" },
@@ -36,7 +36,7 @@ function ProviderSelector({ selected, setSelected }: {
   setSelected: (v: string) => void;
 }) {
   return (
-    <div className="p-4 bg-gray-100 dark:bg-gray-800 rounded-lg">
+    <div>
       <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">
         Провайдер карт
       </h3>
@@ -54,14 +54,88 @@ function ProviderSelector({ selected, setSelected }: {
   );
 }
 
+function SettingMapSelector({ onUpdate }: { onUpdate: (params: { lat: number; lng: number; zoom: number }) => void }){
+  const [zoom, setZoom] = useState(13);
+  const [lat, setLat] = useState(55.7558);
+  const [lng, setLng] = useState(37.6173);
+  
+  const handleUpdate = () => {
+    onUpdate({ lat, lng, zoom });
+  };
+  
+  return(
+    <div className="mt-4">
+      <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">
+        Параметры карты
+      </h3>
+      <div className="grid grid-cols-3 gap-3 mb-3">
+        <div>
+          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Широта
+          </label>
+          <input
+            type="number"
+            step="0.0001"
+            value={lat}
+            onChange={(e) => setLat(Number(e.target.value))}
+            className="w-full p-2 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+            placeholder="55.7558"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Долгота
+          </label>
+          <input
+            type="number"
+            step="0.0001"
+            value={lng}
+            onChange={(e) => setLng(Number(e.target.value))}
+            className="w-full p-2 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+            placeholder="37.6173"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Масштаб
+          </label>
+          <input
+            type="number"
+            step="1"
+            min="1"
+            max="20"
+            value={zoom}
+            onChange={(e) => setZoom(Number(e.target.value))}
+            className="w-full p-2 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+            placeholder="13"
+          />
+                  </div>
+      </div>
+      <button
+        onClick={handleUpdate}
+        className="w-full bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded transition-colors"
+      >
+        Обновить карту
+      </button>
+    </div>
+  );
+}
+
 export default function Page() {
   const [selected, setSelected] = useState<string>("");
+  const geoRef = useRef<GeoImperativeHandle>(null);
 
   // Параметры карты
-  const mapParams = { lng: 37.6173, lat: 55.7558, zoom: 13, width: 1800, height: 500 };
+  const mapParams = { lng: 37.6173, lat: 55.7558, zoom: 13, width: 800, height: 500 };
   
   // Определяем, нужно ли перемещать панель наверх при большой ширине карты
   const isWideMap = mapParams.width > 1200;
+  
+  const handleMapUpdate = (params: { lat: number; lng: number; zoom: number }) => {
+    if (geoRef.current) {
+      geoRef.current.updateMap(params);
+    }
+  };
 
   return (
     <SidebarLayout sidebarData={sidebar} breadcrumb={[{ title: pckg.name, link: '/' }]}>
@@ -77,7 +151,7 @@ export default function Page() {
           <div>
             {selected ? (
               <div className="space-y-4">
-                <Geo provider={selected} {...mapParams} />
+                <Geo ref={geoRef} provider={selected} {...mapParams} />
                 <CodeTemplate provider={selected} params={mapParams} />
               </div>
             ) : (
@@ -92,7 +166,10 @@ export default function Page() {
 
           {/* Селектор провайдера - справа или снизу в зависимости от ширины */}
           <div className="w-full">
-            <ProviderSelector selected={selected} setSelected={setSelected} />
+            <div className="p-4 bg-gray-100 dark:bg-gray-800 rounded-lg"> 
+              <ProviderSelector selected={selected} setSelected={setSelected} />
+              <SettingMapSelector onUpdate={handleMapUpdate}/>
+              </div>
           </div>
         </div>
       </div>
