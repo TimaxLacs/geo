@@ -41,6 +41,8 @@ export interface GeoProps extends GeoMapProps {
     children?: React.ReactNode;
 }
 
+
+
 export const Geo = forwardRef<GeoImperativeHandle, GeoProps>((props, ref) => {
     const { provider, children, ..._props } = props;
     const _provider = useMemo(() => new classes[provider](), [provider]);

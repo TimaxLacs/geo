@@ -12,6 +12,7 @@ interface GoogleMapProps {
   [key: string]: any;
 }
 
+
 // Внутренний компонент, который использует useMap
 function GoogleMapInner({ lng, lat, zoom = 13, onPosition }: { 
   lng: number; 
