@@ -1,7 +1,7 @@
 /// <reference types="yandex-maps" />
 import { YMaps, Map, useYMaps } from '@pbe/react-yandex-maps';
 import { useEffect, useRef, useState, useContext } from 'react';
-import { GeoContext } from '../lib/index';
+import { GeoContext } from '../../providers/lib/index';
 import { useResizeDetector } from 'react-resize-detector';
 
 interface YandexMapProps {

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useContext } from 'react';
 import { Map, APIProvider, useMap } from '@vis.gl/react-google-maps';
-import { GeoContext } from '../lib/index';
+import { GeoContext } from '../../providers/lib/index';
 import { useResizeDetector } from 'react-resize-detector';
 
 interface GoogleMapProps {

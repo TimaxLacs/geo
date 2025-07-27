@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useMemo, useImperativeHandle, forwardRef } from 'react';
-import { YandexGeoProvider } from '../yandex/index';
-import { GoogleGeoProvider } from '../google/index';
-import { TwoGISGeoProvider } from '../2gis/index';
+import { YandexGeoProvider } from '../providers/yandex/index';
+import { GoogleGeoProvider } from '../providers/google/index';
+import { TwoGISGeoProvider } from '../providers/2gis/index';
 
 export interface GeoMapProps {
     lat: number;

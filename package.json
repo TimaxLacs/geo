@@ -43,7 +43,7 @@
     "@pbe/react-yandex-maps": "^1.2.5",
     "@vis.gl/react-google-maps": "^1.5.4",
     "eruda": "^3.4.3",
-    "hasyx": "^0.1.344",
+    "hasyx": "^0.1.373",
     "next-ymaps3-components": "^1.0.2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",

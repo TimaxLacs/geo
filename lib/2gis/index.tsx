@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useContext } from 'react';
 import { load } from '@2gis/mapgl';
-import { GeoContext } from '../lib/index';
+import { GeoContext } from '../../providers/lib/index';
 import { useResizeDetector } from 'react-resize-detector';
 
 interface TwoGISMapProps {
