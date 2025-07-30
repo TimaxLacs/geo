@@ -27,12 +27,12 @@
       "@/*": [
         "./*"
       ],
-      "geo": ["./lib/index.tsx"],
+      "geo": ["./lib/index.ts"],
       "geo/*": ["./*"]
     },
     "types": [
       "jest",
-      "@testing-library/jest-dom"   
+      "@testing-library/jest-dom"
     ]
   },
   "include": [
