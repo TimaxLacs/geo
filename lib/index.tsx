@@ -12,6 +12,7 @@ export interface GeoMapProps {
     onPosition?: (position: { lat: number; lng: number; zoom: number }) => void;
 }
 
+
 export interface GeoProvider {
     GeoMap: React.ComponentType<GeoMapProps>;
     // Императивные методы для обновления карты
