@@ -13,6 +13,7 @@ export async function POST(request: NextRequest) {
   return handleCron();
 }
 
+
 async function handleCron() {
   try {
     // Create admin client for database operations
