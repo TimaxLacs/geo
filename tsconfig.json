@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "baseUrl": ".",
     "target": "ES2017",
     "lib": [
       "dom",
@@ -26,6 +27,9 @@
     "paths": {
       "@/*": [
         "./*"
+      ],
+      "@/components/*": [
+        "components/*"
       ],
       "geo": ["./lib/index.ts"],
       "geo/*": ["./*"]

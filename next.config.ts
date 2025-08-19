@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import createNextIntlPlugin from 'next-intl/plugin';
+import path from 'path';
 
 const withNextIntl = createNextIntlPlugin(
   './lib/i18n/request.ts',
@@ -51,6 +52,9 @@ const config: NextConfig = {
     ignoreDuringBuilds: isBuildingForClient,
   },
   
+  // Add hasyx to transpilePackages to process its aliased imports
+  transpilePackages: ['hasyx'],
+  
   // Add CORS headers to all API routes
   async headers() {
     const headers = [
@@ -95,6 +99,24 @@ const config: NextConfig = {
 
   // Prevent double mount unmount
   reactStrictMode: false,
+  
+  // Ensure alias '@' resolves to project root for both app and dependencies
+  webpack: (config) => {
+    config.resolve = config.resolve || {};
+    config.resolve.alias = {
+      ...(config.resolve.alias || {}),
+      '@': path.resolve(process.cwd()),
+    };
+    return config;
+  },
+
+  experimental: {
+    turbo: {
+      resolveAlias: {
+        '@': path.resolve(process.cwd()),
+      },
+    },
+  },
 };
 
 export default withNextIntl(config);

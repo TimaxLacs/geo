@@ -1,0 +1,18 @@
+{
+  "title": "Geo Maps",
+  "selectProvider": "Select map provider",
+  "mapSettings": "Map settings",
+  "latitude": "Latitude",
+  "longitude": "Longitude",
+  "zoom": "Zoom",
+  "width": "Width",
+  "height": "Height",
+  "updateMap": "Update map",
+  "markers": "Markers",
+  "addMarker": "Add marker",
+  "edit": "Edit",
+  "save": "Save",
+  "cancel": "Cancel",
+  "remove": "Remove",
+  "reposition": "Reposition"
+}

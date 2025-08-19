@@ -94,7 +94,6 @@ export default function RootLayout({
             </NextIntlClientProvider>
             
             {/* PWA Components - available on all pages */}
-            <PWAInstallPrompt />
             <PWAStatus />
           </HasyxProvider>
         </body>

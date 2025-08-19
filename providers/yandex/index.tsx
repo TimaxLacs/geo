@@ -3,6 +3,12 @@ import { YMaps, Map, useYMaps } from '@pbe/react-yandex-maps';
 import { useEffect, useRef, useState, useContext } from 'react';
 import { GeoContext } from '../lib/index';
 import { useResizeDetector } from 'react-resize-detector';
+import { markerEngine } from '@/lib/markers/engine';
+import YandexMarkerAdapter from '@/lib/yandex/markers';
+import { MarkerData, ProviderMarkerHandle } from '@/lib/core/geo-types';
+
+// Регистрируем адаптер в движке при загрузке модуля
+markerEngine.registerAdapter('yandex', YandexMarkerAdapter);
 
 interface YandexMapProps {
   lng: number;
@@ -10,14 +16,16 @@ interface YandexMapProps {
   zoom?: number;
   width?: number | string;
   height?: number | string;
+  onPosition?: (position: { lat: number; lng: number; zoom: number }) => void;
+  onReady?: () => void; // Новый проп для обратного вызова
   [key: string]: any;
 }
 
 // Внутренний компонент, который использует useYMaps
-function YandexMapInner({ lng, lat, zoom = 10, onPosition, ...rest }: Omit<YandexMapProps, 'width' | 'height'>) {
+function YandexMapInner({ lng, lat, zoom = 10, onPosition, onReady, ...rest }: Omit<YandexMapProps, 'width' | 'height'>) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const [mapInstance, setMapInstance] = useState<any>(null);
-  const ymaps = useYMaps(['Map']);
+  const ymaps = useYMaps(['Map', 'Placemark']); // <-- ЗАПРАШИВАЕМ МОДУЛЬ PLACEMARK
   const geoProvider = useContext(GeoContext);
   const { width, height, ref } = useResizeDetector();
 
@@ -29,6 +37,11 @@ function YandexMapInner({ lng, lat, zoom = 10, onPosition, ...rest }: Omit<Yande
         zoom,
       });
       setMapInstance(map);
+      
+      // Вызываем onReady, если он передан
+      if (onReady) {
+        onReady();
+      }
       
       // Простой обработчик изменения позиции - только для обновления инпутов
       if (onPosition) {
@@ -43,9 +56,9 @@ function YandexMapInner({ lng, lat, zoom = 10, onPosition, ...rest }: Omit<Yande
         });
       }
       
-      // Передаем экземпляр карты в провайдер
-      if (geoProvider && (geoProvider as any).setMapInstance) {
-        (geoProvider as any).setMapInstance(map);
+      // Передаем контекст карты в провайдер
+      if (geoProvider && (geoProvider as any).setMapContext) {
+        (geoProvider as any).setMapContext({ map, ymaps });
       }
     }
 
@@ -100,36 +113,96 @@ export default function YandexMap(props: YandexMapProps) {
 }
 
 export class YandexGeoProvider {
-  private mapInstance: any = null;
+  private mapContext: { map: any, ymaps: any } | null = null;
   
   GeoMap = YandexMap;
   
+  // Получение экземпляра карты
+  getMapInstance = () => this.mapContext?.map;
+
   // Императивные методы для обновления карты
   setCenter = (lat: number, lng: number) => {
-    if (this.mapInstance) {
-      this.mapInstance.setCenter([lat, lng]);
+    if (this.mapContext?.map) {
+      this.mapContext.map.setCenter([lat, lng]);
     }
   };
   
   setZoom = (zoom: number) => {
-    if (this.mapInstance) {
-      this.mapInstance.setZoom(zoom);
+    if (this.mapContext?.map) {
+      this.mapContext.map.setZoom(zoom);
     }
   };
   
   updateMap = (params: any) => {
-    if (this.mapInstance) {
+    if (this.mapContext?.map) {
       if (params.lat !== undefined && params.lng !== undefined) {
-        this.mapInstance.setCenter([params.lat, params.lng]);
+        this.mapContext.map.setCenter([params.lat, params.lng]);
       }
       if (params.zoom !== undefined) {
-        this.mapInstance.setZoom(params.zoom);
+        this.mapContext.map.setZoom(params.zoom);
       }
     }
   };
   
   // Метод для установки экземпляра карты
-  setMapInstance = (instance: any) => {
-    this.mapInstance = instance;
+  setMapContext = (context: { map: any, ymaps: any }) => {
+    this.mapContext = context;
+  };
+
+  // --- МЕТОДЫ ДЛЯ РАБОТЫ С МАРКЕРАМИ ---
+
+  addMarker = (marker: MarkerData, onDragEnd: (newPosition: { lat: number, lng: number }) => void): ProviderMarkerHandle => {
+    if (!this.mapContext) throw new Error("Yandex map context is not available.");
+    return markerEngine.mount('yandex', this.mapContext, marker, onDragEnd);
+  };
+
+  removeMarker = (handle: ProviderMarkerHandle) => {
+    if (!this.mapContext) throw new Error("Yandex map context is not available.");
+    markerEngine.unmount('yandex', handle);
+  };
+
+  updateMarker = (handle: ProviderMarkerHandle, marker: MarkerData) => {
+    if (!this.mapContext) throw new Error("Yandex map context is not available.");
+    
+    const placemark = handle.nativeHandle;
+
+    // Обновляем текст (хинт, балун, контент)
+    placemark.properties.set({
+      hintContent: marker.meta?.title,
+      balloonContent: marker.meta?.description,
+      iconContent: marker.meta?.icon?.url ? undefined : marker.meta?.label,
+    });
+
+    // Обновляем иконку
+    if (marker.meta?.icon?.url) {
+      placemark.options.set({
+        // Используем кастомную иконку (текст игнорируется)
+        iconLayout: 'default#image',
+        iconImageHref: marker.meta.icon.url,
+        iconImageSize: [marker.meta.icon.width, marker.meta.icon.height],
+        iconImageOffset: [-(marker.meta.icon.anchorX || 0), -(marker.meta.icon.anchorY || 0)],
+        preset: undefined // Сбрасываем пресет, если есть кастомная иконка
+      });
+    } else {
+      placemark.options.set({
+        // Используем стандартную иконку, которая покажет текст
+        iconLayout: undefined,
+        iconImageHref: undefined,
+        iconImageSize: undefined,
+        iconImageOffset: undefined,
+        preset: 'islands#blueStretchyIcon'
+      });
+    }
+  };
+
+  updateMarkerPosition = (handle: ProviderMarkerHandle, position: { lat: number, lng: number }) => {
+    if (!this.mapContext) throw new Error("Yandex map context is not available.");
+    // Обращаемся напрямую к нативному объекту, чтобы изменить его геометрию
+    handle.nativeHandle.geometry.setCoordinates([position.lat, position.lng]);
+  };
+
+  onMapClick = (callback: (coords: { lat: number, lng: number }) => void): (() => void) => {
+    if (!this.mapContext) throw new Error("Yandex map context is not available.");
+    return markerEngine.subscribeMapClick('yandex', this.mapContext, callback);
   };
 }

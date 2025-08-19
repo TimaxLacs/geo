@@ -25,7 +25,8 @@
     "logs": "npx hasyx logs",
     "logs-diffs": "npx hasyx logs-diffs",
     "logs-states": "npx hasyx logs-states",
-    "env": "npx hasyx env"
+    "env": "npx hasyx env",
+    "config": "npx hasyx config"
   },
   "repository": {
     "type": "git",
@@ -44,15 +45,18 @@
     "@pbe/react-yandex-maps": "^1.2.5",
     "@vis.gl/react-google-maps": "^1.5.4",
     "eruda": "^3.4.3",
-    "hasyx": "^0.1.377",
+    "hasyx": "^0.2.0-alpha.11",
     "next-ymaps3-components": "^1.0.2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "uuid": "^11.1.0",
     "ws": "^8.18.3"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
+    "@types/uuid": "^10.0.0",
     "jest": "^30.0.4",
+    "lucide-react": "^0.539.0",
     "ts-jest": "^29.4.0"
   },
   "engine": {

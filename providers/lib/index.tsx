@@ -2,6 +2,7 @@ import React, { createContext, useContext, useMemo, useImperativeHandle, forward
 import { YandexGeoProvider } from '../yandex/index';
 import { GoogleGeoProvider } from '../google/index';
 import { TwoGISGeoProvider } from '../2gis/index';
+import { MarkerData, ProviderMarkerHandle } from '@/lib/core/geo-types';
 
 export interface GeoMapProps {
     lat: number;
@@ -10,6 +11,7 @@ export interface GeoMapProps {
     width?: number | string;
     height?: number | string;
     onPosition?: (position: { lat: number; lng: number; zoom: number }) => void;
+    onReady?: () => void;
 }
 
 export interface GeoProvider {
@@ -18,6 +20,13 @@ export interface GeoProvider {
     setCenter?: (lat: number, lng: number) => void;
     setZoom?: (zoom: number) => void;
     updateMap?: (params: Partial<GeoMapProps>) => void;
+    
+    // Методы для работы с маркерами
+    addMarker?: (marker: MarkerData, onDragEnd: (newPosition: { lat: number, lng: number }) => void) => ProviderMarkerHandle;
+    removeMarker?: (handle: ProviderMarkerHandle) => void;
+    updateMarker?: (handle: ProviderMarkerHandle, marker: MarkerData) => void;
+    updateMarkerPosition?: (handle: ProviderMarkerHandle, position: { lat: number, lng: number }) => void;
+    onMapClick?: (callback: (coords: { lat: number, lng: number }) => void) => () => void;
 }
 
 // Интерфейс для императивного API
@@ -25,6 +34,13 @@ export interface GeoImperativeHandle {
     setCenter: (lat: number, lng: number) => void;
     setZoom: (zoom: number) => void;
     updateMap: (params: Partial<GeoMapProps>) => void;
+    
+    // Методы для работы с маркерами, которые будут доступны через ref
+    addMarker: (marker: MarkerData, onDragEnd: (newPosition: { lat: number, lng: number }) => void) => ProviderMarkerHandle;
+    removeMarker: (handle: ProviderMarkerHandle) => void;
+    updateMarker: (handle: ProviderMarkerHandle, marker: MarkerData) => void;
+    updateMarkerPosition: (handle: ProviderMarkerHandle, position: { lat: number, lng: number }) => void;
+    onMapClick: (callback: (coords: { lat: number, lng: number }) => void) => () => void;
 }
 
 export const GeoContext = createContext<GeoProvider | undefined>(undefined);
@@ -62,8 +78,42 @@ export const Geo = forwardRef<GeoImperativeHandle, GeoProps>((props, ref) => {
             if (_provider.updateMap) {
                 _provider.updateMap(params);
             }
+        },
+        addMarker: (marker: MarkerData, onDragEnd: (newPosition: { lat: number, lng: number }) => void) => {
+            if (_provider.addMarker) {
+                return _provider.addMarker(marker, onDragEnd);
+            }
+            throw new Error(`Provider ${provider} does not support addMarker.`);
+        },
+        removeMarker: (handle: ProviderMarkerHandle) => {
+            if (_provider.removeMarker) {
+                _provider.removeMarker(handle);
+            } else {
+              throw new Error(`Provider ${provider} does not support removeMarker.`);
+            }
+        },
+        updateMarker: (handle: ProviderMarkerHandle, marker: MarkerData) => {
+          if (_provider.updateMarker) {
+            _provider.updateMarker(handle, marker);
+          } else {
+            throw new Error(`Provider ${provider} does not support updateMarker.`);
+          }
+        },
+        updateMarkerPosition: (handle: ProviderMarkerHandle, position: { lat: number, lng: number }) => {
+            if (_provider.updateMarkerPosition) {
+                _provider.updateMarkerPosition(handle, position);
+            } else {
+                throw new Error(`Provider ${provider} does not support updateMarkerPosition.`);
+            }
+        },
+        onMapClick: (callback: (coords: { lat: number, lng: number }) => void) => {
+            if (_provider.onMapClick) {
+                return _provider.onMapClick(callback);
+            }
+            // Возвращаем пустую функцию отписки, если метод не поддерживается
+            return () => {};
         }
-    }), [_provider]);
+    }), [_provider, provider]);
     
     return (
         <GeoContext.Provider value={_provider}>
