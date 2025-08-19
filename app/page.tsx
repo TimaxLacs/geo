@@ -5,7 +5,7 @@ import sidebar from "@/app/sidebar";
 import pckg from "@/package.json";
 import { useState, useRef, useEffect } from "react";
 import { Geo, GeoImperativeHandle } from "../providers/lib/index";
-import { MarkerData, ProviderId, ProviderMarkerHandle, LatLng } from "@/lib/core/geo-types";
+import { MarkerData, ProviderId, ProviderMarkerHandle, LatLng, GeoObject } from "@/lib/core/geo-types";
 import { v4 as uuidv4 } from 'uuid';
 import { isEqual } from 'lodash';
 import { Pencil, Move, Trash2 } from 'lucide-react';
@@ -189,7 +189,7 @@ function MarkersPanel({
   currentLng: number;
   provider: ProviderId;
   geoHandle: React.RefObject<GeoImperativeHandle | null>;
-  isMapReady: boolean;
+  isMapReady: boolean; // Оставляем для общего понимания, но логика будет строже
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editedLat, setEditedLat] = useState<number>(0);
@@ -198,14 +198,26 @@ function MarkersPanel({
   
   // Добавляем маркер по клику
   useEffect(() => {
+    // Ждем, пока карта будет не просто готова, а готова для ТЕКУЩЕГО провайдера
     if (!geoHandle.current || !provider || !isMapReady) return;
     
-    const unsubscribe = geoHandle.current.onMapClick((coords) => {
+    const unsubscribe = geoHandle.current.onMapClick(async (coords) => {
       
+      // Сначала получаем адрес
+      let address = 'Адрес не определен';
+      try {
+        const results = await geoHandle.current?.reverseGeocode(coords);
+        if (results && results.length > 0) {
+          address = results[0].text;
+        }
+      } catch (error) {
+        console.error("Ошибка обратного геокодирования при клике:", error);
+      }
+
       // Логика создания или репозиции маркера
       if (repositionId) {
         setMarkers(prev => 
-          prev.map(m => m.id === repositionId ? { ...m, position: coords } : m)
+          prev.map(m => m.id === repositionId ? { ...m, position: coords, meta: { ...m.meta, address } } : m)
         );
         setRepositionId(null); // Выключаем режим репозиции
       } else {
@@ -214,7 +226,8 @@ function MarkersPanel({
           provider,
           position: coords,
           meta: {
-            title: `Маркер ${markers.length + 1}`
+            title: `Маркер ${markers.length + 1}`,
+            address: address, // Сразу добавляем адрес
           }
         };
         setMarkers(prev => [...prev, newMarker]);
@@ -224,11 +237,23 @@ function MarkersPanel({
     return () => unsubscribe(); // Отписываемся при размонтировании
   }, [geoHandle, provider, markers, repositionId, setMarkers, isMapReady]);
 
-  const addMarker = () => {
-    if (!provider) {
+  const addMarker = async () => {
+    if (!provider || !geoHandle.current) {
       alert("Сначала выберите провайдера карты");
       return;
     }
+    
+    const coords = { lat: currentLat, lng: currentLng };
+    let address = 'Адрес не определен';
+    try {
+      const results = await geoHandle.current.reverseGeocode(coords);
+      if (results && results.length > 0) {
+        address = results[0].text;
+      }
+    } catch (error) {
+      console.error("Ошибка обратного геокодирования при добавлении маркера:", error);
+    }
+
     const id = uuidv4();
     setMarkers((prev) => [
       ...prev,
@@ -237,8 +262,9 @@ function MarkersPanel({
         provider,
         meta: {
           title: `Маркер ${prev.length + 1}`,
+          address: address,
         },
-        position: { lat: currentLat, lng: currentLng },
+        position: coords,
       },
     ]);
   };
@@ -305,6 +331,20 @@ function MarkersPanel({
                         onChange={(e) => {
                           const newTitle = e.target.value;
                           setMarkers(prev => prev.map(marker => marker.id === m.id ? { ...marker, meta: { ...marker.meta, title: newTitle } } : marker));
+                        }}
+                        className="w-full p-1 rounded-md bg-background/50 text-sidebar-foreground border border-sidebar-border focus:outline-none focus:ring-1 focus:ring-sidebar-ring text-sm"
+                      />
+                    </div>
+
+                    {/* Редактирование адреса */}
+                    <div>
+                      <label className="text-xs text-sidebar-foreground/70">Адрес</label>
+                      <input
+                        type="text"
+                        defaultValue={m.meta?.address || ''}
+                        onChange={(e) => {
+                          const newAddress = e.target.value;
+                          setMarkers(prev => prev.map(marker => marker.id === m.id ? { ...marker, meta: { ...marker.meta, address: newAddress } } : marker));
                         }}
                         className="w-full p-1 rounded-md bg-background/50 text-sidebar-foreground border border-sidebar-border focus:outline-none focus:ring-1 focus:ring-sidebar-ring text-sm"
                       />
@@ -379,6 +419,11 @@ function MarkersPanel({
                     <p className="text-xs text-sidebar-foreground/70">
                       {m.position.lat.toFixed(4)}, {m.position.lng.toFixed(4)}
                     </p>
+                    {m.meta?.address && (
+                      <p className="text-xs text-sidebar-foreground/70 mt-1 italic">
+                        {m.meta.address}
+                      </p>
+                    )}
                     {m.meta?.icon?.url && (
                       <div className="mt-1">
                          <img src={m.meta.icon.url} alt="icon" className="w-6 h-6" />
@@ -429,17 +474,100 @@ function MarkersPanel({
   );
 }
 
+function GeocodePanel({ onResultClick, provider }: { 
+  onResultClick: (obj: GeoObject) => void;
+  provider: ProviderId | "";
+}) {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<GeoObject[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (query.length < 3) {
+      setResults([]);
+      return;
+    }
+
+    const handler = setTimeout(() => {
+      const fetchGeocode = async () => {
+        if (!provider) {
+          setError('Провайдер не выбран');
+          return;
+        }
+        setIsLoading(true);
+        setError(null);
+        try {
+          const response = await fetch(`/api/geocode?provider=${provider}&address=${encodeURIComponent(query)}`);
+          if (!response.ok) {
+            throw new Error('Ошибка при поиске адреса');
+          }
+          const data = await response.json();
+          setResults(data);
+        } catch (err: any) {
+          setError(err.message);
+          setResults([]);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
+      fetchGeocode();
+    }, 500); // Debounce 500ms
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [query, provider]);
+
+  const handleItemClick = (result: GeoObject) => {
+    setQuery(result.name); // Обновляем инпут, чтобы было видно, что выбрали
+    setResults([]);       // Скрываем результаты
+    onResultClick(result);
+  };
+
+  return (
+    <div className="mt-4">
+      <h3 className="font-semibold text-sidebar-foreground mb-3">Поиск по адресу</h3>
+      <input
+        type="text"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Введите адрес..."
+        className="w-full p-2 rounded-md bg-sidebar-accent text-sidebar-foreground border border-sidebar-border focus:outline-none focus:ring-2 focus:ring-sidebar-ring"
+      />
+      {isLoading && <div className="text-xs mt-2 text-sidebar-foreground/70">Поиск...</div>}
+      {error && <div className="text-xs mt-2 text-red-500">{error}</div>}
+      {results.length > 0 && (
+        <ul className="mt-2 space-y-1 bg-background/50 border border-sidebar-border rounded-md p-1 max-h-48 overflow-y-auto">
+          {results.map((result, index) => (
+            <li 
+              key={`${result.coords.lat}-${result.coords.lng}-${index}`}
+              onClick={() => handleItemClick(result)}
+              className="p-2 text-sm rounded-md hover:bg-sidebar-accent cursor-pointer text-sidebar-foreground"
+            >
+              <p className="font-semibold">{result.name}</p>
+              <p className="text-xs text-sidebar-foreground/70">{result.description}</p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 export default function Page() {
   const [selected, setSelected] = useState<ProviderId | "">("yandex");
   const geoRef = useRef<GeoImperativeHandle>(null);
   const [mapSize, setMapSize] = useState({ width: 800, height: 500 });
   const [markers, setMarkers] = useState<MarkerData[]>([]);
   const [markerHandles, setMarkerHandles] = useState<Record<string, { handle: ProviderMarkerHandle, marker: MarkerData }>>({});
-  const [isMapReady, setIsMapReady] = useState(false);
+  const [readyProvider, setReadyProvider] = useState<ProviderId | "">("");
 
   // Синхронизация маркеров на карте с состоянием
   useEffect(() => {
-    if (!geoRef.current || !selected || !isMapReady) return;
+    const isReady = selected === readyProvider;
+    if (!geoRef.current || !selected || !isReady) return;
 
     const currentMarkerIds = markers.map(m => m.id);
     const handledMarkerIds = Object.keys(markerHandles);
@@ -487,9 +615,20 @@ export default function Page() {
         // Новый маркер, добавляем его
         if (marker.provider === selected) {
           
-          const handleDragEnd = (newPosition: LatLng) => {
+          const handleDragEnd = async (newPosition: LatLng) => {
+            // Сначала получаем адрес для новой позиции
+            let newAddress = 'Не удалось обновить адрес';
+            try {
+              const results = await geoRef.current?.reverseGeocode(newPosition);
+              if (results && results.length > 0) {
+                newAddress = results[0].text;
+              }
+            } catch (error) {
+              console.error("Ошибка обратного геокодирования при перетаскивании:", error);
+            }
+            
             setMarkers(prev => 
-              prev.map(m => m.id === marker.id ? { ...m, position: newPosition } : m)
+              prev.map(m => m.id === marker.id ? { ...m, position: newPosition, meta: { ...m.meta, address: newAddress } } : m)
             );
           };
 
@@ -502,7 +641,7 @@ export default function Page() {
       }
     });
 
-  }, [markers, selected, geoRef, isMapReady]); // Убрали markerHandles из зависимостей
+  }, [markers, selected, geoRef, readyProvider]); // Исправлена зависимость
   
   // Два отдельных состояния для разделения источников
   const [inputPosition, setInputPosition] = useState({ lat: 55.7558, lng: 37.6173, zoom: 13 }); // Обновляется от карты
@@ -544,6 +683,28 @@ export default function Page() {
     setInputPosition(position);
   };
 
+  const handleSearchResultClick = (obj: GeoObject) => {
+    if (!selected) return;
+
+    // 1. Центрируем карту на выбранном результате
+    const newPosition = { lat: obj.coords.lat, lng: obj.coords.lng, zoom: 17 }; // Приближаем для детализации
+    setMapPosition(newPosition);
+    setInputPosition(newPosition); // Синхронизируем инпуты
+
+    // 2. Создаем новый маркер
+    const newMarker: MarkerData = {
+      id: uuidv4(),
+      provider: selected,
+      position: obj.coords,
+      meta: {
+        title: obj.name,
+        description: obj.text,
+        address: obj.text, // Сразу добавляем адрес
+      }
+    };
+    setMarkers(prev => [...prev, newMarker]);
+  };
+
   return (
     <SidebarLayout sidebarData={sidebar} breadcrumb={[{ title: pckg.name, link: '/' }]}>
       <div className="p-6">
@@ -566,7 +727,7 @@ export default function Page() {
                     ref={geoRef} 
                     provider={selected} 
                     onPosition={handlePositionChange}
-                    onReady={() => setIsMapReady(true)}
+                    onReady={() => setReadyProvider(selected as ProviderId)}
                     {...mapParams} 
                   />
                 </div>
@@ -583,9 +744,10 @@ export default function Page() {
           </div>
 
           {/* Селектор провайдера - справа или снизу в зависимости от ширины */}
-          <div className="w-full">
-            <div className="p-4 bg-sidebar border border-sidebar-border rounded-lg"> 
+          <div className="w-full min-h-0">
+            <div className="p-4 bg-sidebar border border-sidebar-border rounded-lg h-full overflow-y-scroll"> 
               <ProviderSelector selected={selected} setSelected={setSelected} />
+              <GeocodePanel onResultClick={handleSearchResultClick} provider={selected} />
               {/* Передаем inputPosition в панель (показываем актуальные координаты от карты) */}
               <SettingMapSelector onUpdate={handleMapUpdate} position={inputPosition}/>
               {/* Интерфейс управления маркерами (только UI) */}
@@ -596,7 +758,7 @@ export default function Page() {
                 currentLng={inputPosition.lng}
                 provider={selected as ProviderId}
                 geoHandle={geoRef}
-                isMapReady={isMapReady}
+                isMapReady={selected === readyProvider}
               />
               </div>
           </div>

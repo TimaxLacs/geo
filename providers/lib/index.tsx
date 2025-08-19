@@ -2,7 +2,7 @@ import React, { createContext, useContext, useMemo, useImperativeHandle, forward
 import { YandexGeoProvider } from '../yandex/index';
 import { GoogleGeoProvider } from '../google/index';
 import { TwoGISGeoProvider } from '../2gis/index';
-import { MarkerData, ProviderMarkerHandle } from '@/lib/core/geo-types';
+import { MarkerData, ProviderMarkerHandle, GeoObject, LatLng } from '@/lib/core/geo-types';
 
 export interface GeoMapProps {
     lat: number;
@@ -27,6 +27,10 @@ export interface GeoProvider {
     updateMarker?: (handle: ProviderMarkerHandle, marker: MarkerData) => void;
     updateMarkerPosition?: (handle: ProviderMarkerHandle, position: { lat: number, lng: number }) => void;
     onMapClick?: (callback: (coords: { lat: number, lng: number }) => void) => () => void;
+    
+    // Методы для геокодинга
+    geocode?: (address: string) => Promise<GeoObject[]>;
+    reverseGeocode?: (position: LatLng) => Promise<GeoObject[]>;
 }
 
 // Интерфейс для императивного API
@@ -41,6 +45,10 @@ export interface GeoImperativeHandle {
     updateMarker: (handle: ProviderMarkerHandle, marker: MarkerData) => void;
     updateMarkerPosition: (handle: ProviderMarkerHandle, position: { lat: number, lng: number }) => void;
     onMapClick: (callback: (coords: { lat: number, lng: number }) => void) => () => void;
+    
+    // Методы для геокодинга
+    geocode: (address: string) => Promise<GeoObject[]>;
+    reverseGeocode: (position: LatLng) => Promise<GeoObject[]>;
 }
 
 export const GeoContext = createContext<GeoProvider | undefined>(undefined);
@@ -112,6 +120,18 @@ export const Geo = forwardRef<GeoImperativeHandle, GeoProps>((props, ref) => {
             }
             // Возвращаем пустую функцию отписки, если метод не поддерживается
             return () => {};
+        },
+        geocode: async (address: string) => {
+            if (_provider.geocode) {
+                return _provider.geocode(address);
+            }
+            throw new Error(`Provider ${provider} does not support geocode.`);
+        },
+        reverseGeocode: async (position: LatLng) => {
+            if (_provider.reverseGeocode) {
+                return _provider.reverseGeocode(position);
+            }
+            throw new Error(`Provider ${provider} does not support reverseGeocode.`);
         }
     }), [_provider, provider]);
     

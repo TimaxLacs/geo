@@ -5,9 +5,9 @@ import { GeoContext } from '../lib/index';
 import { useResizeDetector } from 'react-resize-detector';
 import { markerEngine } from '@/lib/markers/engine';
 import YandexMarkerAdapter from '@/lib/yandex/markers';
-import { MarkerData, ProviderMarkerHandle } from '@/lib/core/geo-types';
+import { MarkerData, ProviderMarkerHandle, GeoObject, LatLng } from '@/lib/core/geo-types';
 
-// Регистрируем адаптер в движке при загрузке модуля
+// Регистрируем адаптер при загруз-ке модуля
 markerEngine.registerAdapter('yandex', YandexMarkerAdapter);
 
 interface YandexMapProps {
@@ -25,7 +25,7 @@ interface YandexMapProps {
 function YandexMapInner({ lng, lat, zoom = 10, onPosition, onReady, ...rest }: Omit<YandexMapProps, 'width' | 'height'>) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const [mapInstance, setMapInstance] = useState<any>(null);
-  const ymaps = useYMaps(['Map', 'Placemark']); // <-- ЗАПРАШИВАЕМ МОДУЛЬ PLACEMARK
+  const ymaps = useYMaps(['Map', 'Placemark']); // <-- УБИРАЕМ ЗАПРОС МОДУЛЯ GEOCODE
   const geoProvider = useContext(GeoContext);
   const { width, height, ref } = useResizeDetector();
 
@@ -204,5 +204,35 @@ export class YandexGeoProvider {
   onMapClick = (callback: (coords: { lat: number, lng: number }) => void): (() => void) => {
     if (!this.mapContext) throw new Error("Yandex map context is not available.");
     return markerEngine.subscribeMapClick('yandex', this.mapContext, callback);
+  };
+  
+  // --- МЕТОДЫ ДЛЯ ГЕОКОДИНГА (теперь через наш API) ---
+
+  geocode = async (address: string): Promise<GeoObject[]> => {
+    try {
+      const response = await fetch(`/api/geocode?provider=yandex&address=${encodeURIComponent(address)}`);
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || 'Ошибка при поиске адреса');
+      }
+      return await response.json();
+    } catch (error) {
+      console.error("Yandex geocode error:", error);
+      return [];
+    }
+  };
+
+  reverseGeocode = async (position: LatLng): Promise<GeoObject[]> => {
+    try {
+      const response = await fetch(`/api/geocode?provider=yandex&lat=${position.lat}&lng=${position.lng}`);
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || 'Ошибка при обратном геокодировании');
+      }
+      return await response.json();
+    } catch (error) {
+      console.error("Yandex reverse geocode error:", error);
+      return [];
+    }
   };
 }
