@@ -35,6 +35,23 @@ type GoogleGeocodeResult = {
   status: string;
 };
 
+type TwoGisGeocodeResult = {
+  result: {
+    items: {
+      full_name: string;
+      name: string;
+      type: string;
+      point: {
+        lat: number;
+        lon: number;
+      };
+    }[];
+  };
+  meta: {
+    api_version: string;
+    code: number;
+  };
+};
 
 async function yandexGeocode(query: string): Promise<GeoObject[]> {
   const apiKey = process.env.YANDEX_MAPS_API_KEY;
@@ -105,6 +122,32 @@ async function googleGeocode(address?: string | null, latlng?: string | null): P
   }
 }
 
+async function twoGisGeocode(query: string): Promise<GeoObject[]> {
+  const apiKey = process.env.TWOGIS_API_KEY;
+  if (!apiKey) throw new Error('2GIS API key is not configured.');
+
+  const url = `https://catalog.api.2gis.com/3.0/items/geocode?q=${encodeURIComponent(query)}&key=${apiKey}`;
+  
+  try {
+    const response = await fetch(url);
+    const data: TwoGisGeocodeResult = await response.json();
+
+    if (data.meta.code !== 200) {
+      throw new Error(`2GIS Geocode API error: ${data.meta.code}`);
+    }
+
+    return data.result.items.map(item => ({
+      coords: { lat: item.point.lat, lng: item.point.lon },
+      name: item.name,
+      description: item.type,
+      text: item.full_name,
+    }));
+  } catch (error) {
+    console.error('2GIS geocode fetch error:', error);
+    return [];
+  }
+}
+
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const provider = searchParams.get('provider');
@@ -128,6 +171,14 @@ export async function GET(request: NextRequest) {
       } else if (lat && lng) {
         results = await googleGeocode(null, `${lat},${lng}`);
       }
+    } else if (provider === '2gis') {
+      let query = '';
+      if (address) {
+        query = address;
+      } else if (lat && lng) {
+        query = `${lng},${lat}`;
+      }
+      results = await twoGisGeocode(query);
     } else {
       return NextResponse.json({ error: `Provider "${provider}" is not supported yet.` }, { status: 400 });
     }
