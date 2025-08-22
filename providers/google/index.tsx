@@ -2,7 +2,7 @@ import { useEffect, useContext } from 'react';
 import { Map, APIProvider, useMap } from '@vis.gl/react-google-maps';
 import { GeoContext } from '../lib/index';
 import { useResizeDetector } from 'react-resize-detector';
-import { MarkerData, ProviderMarkerHandle } from '@/lib/core/geo-types';
+import { MarkerData, ProviderMarkerHandle, GeoObject, LatLng } from '@/lib/core/geo-types';
 import { markerEngine } from '@/lib/markers/engine';
 import GoogleMarkerAdapter from '@/lib/google/markers';
 
@@ -187,5 +187,35 @@ export class GoogleGeoProvider {
   onMapClick = (callback: (coords: { lat: number, lng: number }) => void): (() => void) => {
     if (!this.mapInstance) throw new Error("Google map instance is not available.");
     return markerEngine.subscribeMapClick('google', { map: this.mapInstance }, callback);
+  };
+  
+  // --- МЕТОДЫ ДЛЯ ГЕОКОДИНГА (через наш API) ---
+
+  geocode = async (address: string): Promise<GeoObject[]> => {
+    try {
+      const response = await fetch(`/api/geocode?provider=google&address=${encodeURIComponent(address)}`);
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || 'Ошибка при поиске адреса');
+      }
+      return await response.json();
+    } catch (error) {
+      console.error("Google geocode error:", error);
+      return [];
+    }
+  };
+
+  reverseGeocode = async (position: LatLng): Promise<GeoObject[]> => {
+    try {
+      const response = await fetch(`/api/geocode?provider=google&lat=${position.lat}&lng=${position.lng}`);
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || 'Ошибка при обратном геокодировании');
+      }
+      return await response.json();
+    } catch (error) {
+      console.error("Google reverse geocode error:", error);
+      return [];
+    }
   };
 } 
