@@ -5,10 +5,14 @@ import { GeoContext } from '../lib/index';
 import { useResizeDetector } from 'react-resize-detector';
 import { markerEngine } from '@/lib/markers/engine';
 import YandexMarkerAdapter from '@/lib/yandex/markers';
-import { MarkerData, ProviderMarkerHandle, GeoObject, LatLng } from '@/lib/core/geo-types';
+import { MarkerData, ProviderMarkerHandle, GeoObject, LatLng, ZoneData, ProviderZoneHandle } from '@/lib/core/geo-types';
+import { zoneEngine } from '@/lib/zones/engine';
+import { YandexZoneAdapter } from '@/lib/yandex/zones';
 
-// Регистрируем адаптер при загруз-ке модуля
+
+// Регистрируем адаптеры при загрузке модуля
 markerEngine.registerAdapter('yandex', YandexMarkerAdapter);
+zoneEngine.registerAdapter('yandex', new YandexZoneAdapter());
 
 interface YandexMapProps {
   lng: number;
@@ -25,7 +29,7 @@ interface YandexMapProps {
 function YandexMapInner({ lng, lat, zoom = 10, onPosition, onReady, ...rest }: Omit<YandexMapProps, 'width' | 'height'>) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const [mapInstance, setMapInstance] = useState<any>(null);
-  const ymaps = useYMaps(['Map', 'Placemark']); // <-- УБИРАЕМ ЗАПРОС МОДУЛЯ GEOCODE
+  const ymaps = useYMaps(['Map', 'Placemark', 'Circle', 'Polygon', 'Polyline', 'geoObject.addon.editor']); // Добавляем модули для зон
   const geoProvider = useContext(GeoContext);
   const { width, height, ref } = useResizeDetector();
 
@@ -204,6 +208,28 @@ export class YandexGeoProvider {
   onMapClick = (callback: (coords: { lat: number, lng: number }) => void): (() => void) => {
     if (!this.mapContext) throw new Error("Yandex map context is not available.");
     return markerEngine.subscribeMapClick('yandex', this.mapContext, callback);
+  };
+  
+  // --- МЕТОДЫ ДЛЯ РАБОТЫ С ЗОНАМИ ---
+
+  addZone = (zone: ZoneData, onEditEnd: (newGeometry: LatLng[] | LatLng, newRadius?: number) => void): ProviderZoneHandle => {
+    if (!this.mapContext) throw new Error("Yandex map context is not available.");
+    return zoneEngine.mount('yandex', this.mapContext, zone, onEditEnd);
+  };
+
+  removeZone = (handle: ProviderZoneHandle) => {
+    if (!this.mapContext) throw new Error("Yandex map context is not available.");
+    zoneEngine.unmount('yandex', handle);
+  };
+
+  updateZone = (handle: ProviderZoneHandle, newZoneData: ZoneData) => {
+    if (!this.mapContext) throw new Error("Yandex map context is not available.");
+    zoneEngine.update('yandex', handle, newZoneData);
+  };
+
+  setZoneEditable = (handle: ProviderZoneHandle, editable: boolean) => {
+    if (!this.mapContext) throw new Error("Yandex map context is not available.");
+    zoneEngine.setEditable('yandex', handle, editable);
   };
   
   // --- МЕТОДЫ ДЛЯ ГЕОКОДИНГА (теперь через наш API) ---

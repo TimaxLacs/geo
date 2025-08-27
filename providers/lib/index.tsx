@@ -2,7 +2,7 @@ import React, { createContext, useContext, useMemo, useImperativeHandle, forward
 import { YandexGeoProvider } from '../yandex/index';
 import { GoogleGeoProvider } from '../google/index';
 import { TwoGISGeoProvider } from '../2gis/index';
-import { MarkerData, ProviderMarkerHandle, GeoObject, LatLng } from '@/lib/core/geo-types';
+import { MarkerData, ProviderMarkerHandle, GeoObject, LatLng, ZoneData, ProviderZoneHandle } from '@/lib/core/geo-types';
 
 export interface GeoMapProps {
     lat: number;
@@ -28,6 +28,12 @@ export interface GeoProvider {
     updateMarkerPosition?: (handle: ProviderMarkerHandle, position: { lat: number, lng: number }) => void;
     onMapClick?: (callback: (coords: { lat: number, lng: number }) => void) => () => void;
     
+    // Методы для работы с зонами
+    addZone?: (zone: ZoneData, onEditEnd: (newGeometry: LatLng[] | LatLng, newRadius?: number) => void) => ProviderZoneHandle;
+    removeZone?: (handle: ProviderZoneHandle) => void;
+    updateZone?: (handle: ProviderZoneHandle, newZoneData: ZoneData) => void;
+    setZoneEditable?: (handle: ProviderZoneHandle, editable: boolean) => void;
+
     // Методы для геокодинга
     geocode?: (address: string) => Promise<GeoObject[]>;
     reverseGeocode?: (position: LatLng) => Promise<GeoObject[]>;
@@ -46,6 +52,12 @@ export interface GeoImperativeHandle {
     updateMarkerPosition: (handle: ProviderMarkerHandle, position: { lat: number, lng: number }) => void;
     onMapClick: (callback: (coords: { lat: number, lng: number }) => void) => () => void;
     
+    // Методы для работы с зонами
+    addZone: (zone: ZoneData, onEditEnd: (newGeometry: LatLng[] | LatLng, newRadius?: number) => void) => ProviderZoneHandle;
+    removeZone: (handle: ProviderZoneHandle) => void;
+    updateZone: (handle: ProviderZoneHandle, newZoneData: ZoneData) => void;
+    setZoneEditable: (handle: ProviderZoneHandle, editable: boolean) => void;
+
     // Методы для геокодинга
     geocode: (address: string) => Promise<GeoObject[]>;
     reverseGeocode: (position: LatLng) => Promise<GeoObject[]>;
@@ -120,6 +132,33 @@ export const Geo = forwardRef<GeoImperativeHandle, GeoProps>((props, ref) => {
             }
             // Возвращаем пустую функцию отписки, если метод не поддерживается
             return () => {};
+        },
+        addZone: (zone: ZoneData, onEditEnd: (newGeometry: LatLng[] | LatLng, newRadius?: number) => void) => {
+            if (_provider.addZone) {
+                return _provider.addZone(zone, onEditEnd);
+            }
+            throw new Error(`Provider ${provider} does not support addZone.`);
+        },
+        removeZone: (handle: ProviderZoneHandle) => {
+            if (_provider.removeZone) {
+                _provider.removeZone(handle);
+            } else {
+                throw new Error(`Provider ${provider} does not support removeZone.`);
+            }
+        },
+        updateZone: (handle: ProviderZoneHandle, newZoneData: ZoneData) => {
+            if (_provider.updateZone) {
+                _provider.updateZone(handle, newZoneData);
+            } else {
+                throw new Error(`Provider ${provider} does not support updateZone.`);
+            }
+        },
+        setZoneEditable: (handle: ProviderZoneHandle, editable: boolean) => {
+            if (_provider.setZoneEditable) {
+                _provider.setZoneEditable(handle, editable);
+            } else {
+                throw new Error(`Provider ${provider} does not support setZoneEditable.`);
+            }
         },
         geocode: async (address: string) => {
             if (_provider.geocode) {

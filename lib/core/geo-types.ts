@@ -41,3 +41,35 @@ export interface GeoObject {
   description: string; // Более подробное описание (город, регион)
   text: string;        // Полный адрес
 }
+
+export type ZoneType = 'circle' | 'polygon' | 'polyline' | 'rectangle';
+
+export interface ZoneStyle {
+  strokeColor?: string;
+  strokeWidth?: number;
+  strokeOpacity?: number;
+  fillColor?: string;
+  fillOpacity?: number;
+}
+
+export interface ZoneData {
+  id: string;
+  provider: ProviderId;
+  type: ZoneType;
+  geometry: LatLng[] | LatLng; // Массив вершин для полигонов/линий, центр для круга
+  radius?: number; // Только для круга (в метрах)
+  editable?: boolean;
+  meta?: {
+    title?: string;
+    description?: string;
+  };
+  style?: ZoneStyle;
+}
+
+export interface ProviderZoneHandle {
+  id: string;
+  remove: () => void;
+  update: (zone: ZoneData) => void;
+  setEditable: (editable: boolean) => void;
+  nativeHandle: any; // Ссылка на нативный объект (ymaps.GeoObject, google.maps.Polygon, etc.)
+}

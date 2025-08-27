@@ -5,10 +5,11 @@ import sidebar from "@/app/sidebar";
 import pckg from "@/package.json";
 import { useState, useRef, useEffect } from "react";
 import { Geo, GeoImperativeHandle } from "../providers/lib/index";
-import { MarkerData, ProviderId, ProviderMarkerHandle, LatLng, GeoObject } from "@/lib/core/geo-types";
+import { MarkerData, ProviderId, ProviderMarkerHandle, LatLng, GeoObject, ZoneData, ProviderZoneHandle, ZoneType } from "@/lib/core/geo-types";
 import { v4 as uuidv4 } from 'uuid';
 import { isEqual } from 'lodash';
 import { MarkersControlPanel } from "@/components/markers-panel";
+import { ZonesPanel } from "@/components/zones-panel";
 
 const MAP_OPTIONS: { label: string; value: ProviderId }[] = [
   { label: "Яндекс", value: "yandex" },
@@ -182,6 +183,12 @@ export default function Page() {
   const [markerHandles, setMarkerHandles] = useState<Record<string, { handle: ProviderMarkerHandle, marker: MarkerData }>>({});
   const [readyProvider, setReadyProvider] = useState<ProviderId | "">("");
 
+  // Состояния для зон
+  const [zones, setZones] = useState<ZoneData[]>([]);
+  const [zoneHandles, setZoneHandles] = useState<Record<string, ProviderZoneHandle>>({});
+  const [drawingMode, setDrawingMode] = useState<ZoneType | null>(null);
+  const [currentPolygonPoints, setCurrentPolygonPoints] = useState<LatLng[]>([]);
+
   // Синхронизация маркеров на карте с состоянием
   useEffect(() => {
     const isReady = selected === readyProvider;
@@ -259,8 +266,124 @@ export default function Page() {
       }
     });
 
-  }, [markers, selected, geoRef, readyProvider]); // Исправлена зависимость
+  }, [markers, selected, geoRef, readyProvider]);
+
+  // Синхронизация зон на карте с состоянием
+  useEffect(() => {
+    const isReady = selected === readyProvider;
+    if (!geoRef.current || !selected || !isReady) return;
   
+    const currentZoneIds = zones.map(z => z.id);
+    const handledZoneIds = Object.keys(zoneHandles);
+  
+    // Удаляем зоны, которых больше нет в состоянии
+    handledZoneIds.forEach(id => {
+      if (!currentZoneIds.includes(id)) {
+        zoneHandles[id].remove();
+        setZoneHandles(prev => {
+          const newHandles = { ...prev };
+          delete newHandles[id];
+          return newHandles;
+        });
+      }
+    });
+  
+    // Добавляем новые или обновляем существующие зоны
+    zones.forEach(zone => {
+      const existingHandle = zoneHandles[zone.id];
+      
+      if (existingHandle) {
+        // Зона уже есть, обновляем ее
+        existingHandle.update(zone);
+        if (zone.editable !== undefined) {
+          existingHandle.setEditable(zone.editable);
+        }
+      } else {
+        // Новая зона, добавляем ее
+        if (zone.provider === selected) {
+          const onEditEnd = (newGeometry: LatLng[] | LatLng, newRadius?: number) => {
+            setZones(prev => prev.map(z => {
+              if (z.id === zone.id) {
+                const updatedZone = { ...z, geometry: newGeometry };
+                if (newRadius !== undefined && updatedZone.type === 'circle') {
+                  updatedZone.radius = newRadius;
+                }
+                return updatedZone;
+              }
+              return z;
+            }));
+          };
+
+          const handle = geoRef.current?.addZone(zone, onEditEnd);
+          if (handle) {
+            setZoneHandles(prev => ({ ...prev, [zone.id]: handle }));
+          }
+        }
+      }
+    });
+  
+  }, [zones, selected, geoRef, readyProvider]);
+
+
+  // Обработка кликов на карте для рисования зон
+  useEffect(() => {
+    if (!drawingMode || !geoRef.current || selected !== readyProvider) return;
+
+    const unsubscribe = geoRef.current.onMapClick((coords) => {
+      if (drawingMode === 'circle') {
+        const newZone: ZoneData = {
+          id: uuidv4(),
+          provider: selected as ProviderId,
+          type: 'circle',
+          geometry: coords,
+          radius: 1000, // 1 км по умолчанию
+          editable: false, // Изначально редактирование выключено
+          meta: { title: `Круг #${zones.length + 1}` },
+          style: { fillColor: '#ff000033', strokeColor: '#ff0000', strokeWidth: 2 },
+        };
+        setZones(prev => [...prev, newZone]);
+        setDrawingMode(null); // Выключаем режим рисования после создания
+      } else if (drawingMode === 'polygon' || drawingMode === 'polyline') {
+        const updatedPoints = [...currentPolygonPoints, coords];
+        setCurrentPolygonPoints(updatedPoints);
+        // Для завершения полигона/линии используется кнопка в UI
+      } else if (drawingMode === 'rectangle') {
+        if (currentPolygonPoints.length === 0) {
+          // Первый клик - задаем начальную точку
+          setCurrentPolygonPoints([coords]);
+        } else {
+          // Второй клик - завершаем прямоугольник
+          const p1 = currentPolygonPoints[0];
+          const p2 = coords;
+          
+          // Формируем геометрию прямоугольника из двух диагональных точек
+          const rectangleGeometry: LatLng[] = [
+            p1,
+            { lat: p1.lat, lng: p2.lng },
+            p2,
+            { lat: p2.lat, lng: p1.lng }
+          ];
+
+          const newZone: ZoneData = {
+            id: uuidv4(),
+            provider: selected as ProviderId,
+            type: 'polygon', // Прямоугольник представляется как полигон
+            geometry: rectangleGeometry,
+            editable: false, // Изначально редактирование выключено
+            meta: { title: `Прямоугольник #${zones.length + 1}` },
+            style: { fillColor: '#ff8c0033', strokeColor: '#ff8c00', strokeWidth: 2 },
+          };
+          setZones(prev => [...prev, newZone]);
+          setCurrentPolygonPoints([]);
+          setDrawingMode(null);
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, [drawingMode, geoRef, selected, readyProvider, currentPolygonPoints, zones.length]);
+
+
   // Два отдельных состояния для разделения источников
   const [inputPosition, setInputPosition] = useState({ lat: 55.7558, lng: 37.6173, zoom: 13 }); // Обновляется от карты
   const [mapPosition, setMapPosition] = useState({ lat: 55.7558, lng: 37.6173, zoom: 13 }); // Обновляется от инпутов
@@ -367,6 +490,18 @@ export default function Page() {
               <ProviderSelector selected={selected} setSelected={setSelected} />
               {/* Передаем inputPosition в панель (показываем актуальные координаты от карты) */}
               <SettingMapSelector onUpdate={handleMapUpdate} position={inputPosition}/>
+              
+              {/* Панель управления зонами */}
+              <ZonesPanel
+                zones={zones}
+                setZones={setZones}
+                drawingMode={drawingMode}
+                setDrawingMode={setDrawingMode}
+                currentPolygonPoints={currentPolygonPoints}
+                setCurrentPolygonPoints={setCurrentPolygonPoints}
+                provider={selected as ProviderId}
+              />
+
               {/* Интерфейс управления маркерами и геокодингом */}
               <MarkersControlPanel
                 markers={markers}
