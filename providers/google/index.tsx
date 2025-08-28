@@ -2,12 +2,15 @@ import { useEffect, useContext } from 'react';
 import { Map, APIProvider, useMap } from '@vis.gl/react-google-maps';
 import { GeoContext } from '../lib/index';
 import { useResizeDetector } from 'react-resize-detector';
-import { MarkerData, ProviderMarkerHandle, GeoObject, LatLng } from '@/lib/core/geo-types';
+import { MarkerData, ProviderMarkerHandle, GeoObject, LatLng, ZoneData, ProviderZoneHandle } from '@/lib/core/geo-types';
 import { markerEngine } from '@/lib/markers/engine';
 import GoogleMarkerAdapter from '@/lib/google/markers';
+import { zoneEngine } from '@/lib/zones/engine';
+import { GoogleZoneAdapter } from '@/lib/google/zones';
 
-// Регистрируем адаптер при загрузке модуля
+// Регистрируем адаптеры при загрузке модуля
 markerEngine.registerAdapter('google', GoogleMarkerAdapter);
+zoneEngine.registerAdapter('google', new GoogleZoneAdapter());
 
 interface GoogleMapProps {
   lng: number;
@@ -188,6 +191,24 @@ export class GoogleGeoProvider {
     if (!this.mapInstance) throw new Error("Google map instance is not available.");
     return markerEngine.subscribeMapClick('google', { map: this.mapInstance }, callback);
   };
+  
+  // --- Методы для работы с зонами ---
+  addZone = (zone: ZoneData, onEditEnd: (newGeometry: LatLng | LatLng[], newRadius?: number) => void): ProviderZoneHandle => {
+    if (!this.mapInstance) throw new Error("Google map instance is not available.");
+    return zoneEngine.mount('google', { map: this.mapInstance }, zone, onEditEnd);
+  }
+
+  removeZone = (handle: ProviderZoneHandle): void => {
+    zoneEngine.unmount('google', handle);
+  }
+
+  updateZone = (handle: ProviderZoneHandle, newZoneData: ZoneData): void => {
+    zoneEngine.update('google', handle, newZoneData);
+  }
+
+  setZoneEditable = (handle: ProviderZoneHandle, editable: boolean): void => {
+    zoneEngine.setEditable('google', handle, editable);
+  }
   
   // --- МЕТОДЫ ДЛЯ ГЕОКОДИНГА (через наш API) ---
 
