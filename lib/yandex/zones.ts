@@ -56,15 +56,30 @@ export class YandexZoneAdapter implements ZoneAdapter {
             geoObject.editor.startEditing();
         }
 
-        // Подписка на окончание редактирования
-        geoObject.editor.events.add('geometrychange', (e: any) => {
-            const newNativeGeometry = e.get('newCoordinates') || e.get('newGeometry');
-            const newRadius = e.get('newRadius');
+        // --- РЕШЕНИЕ ПРОБЛЕМЫ БЕСКОНЕЧНОГО ЦИКЛА (ВАРИАНТ 6) ---
+
+        // 1. Создаем локальный флаг, инкапсулированный в замыкании этого метода.
+        //    Только этот конкретный экземпляр зоны будет знать о своем флаге.
+        let isUpdatingByCode = false;
+
+        // 2. Создаем обработчик, который проверяет этот флаг.
+        const geometryChangeHandler = () => {
+            // Если обновление пришло от нашего кода, а не от пользователя на карте, игнорируем событие.
+            if (isUpdatingByCode) {
+                return;
+            }
+
+            const newNativeGeometry = geoObject.geometry.getCoordinates();
+            const newRadius = geoObject.geometry.getRadius ? geoObject.geometry.getRadius() : undefined;
+
             if (newNativeGeometry) {
                 const newCoords = fromYandexCoords(newNativeGeometry);
                 onEditEnd(newCoords, newRadius);
             }
-        });
+        };
+
+        // 3. Подписываем наш новый, "умный" обработчик на событие.
+        geoObject.editor.events.add('geometrychange', geometryChangeHandler);
 
         const handle: ProviderZoneHandle = {
             id: zone.id,
@@ -72,8 +87,19 @@ export class YandexZoneAdapter implements ZoneAdapter {
             remove: () => {
                 context.map.geoObjects.remove(geoObject);
             },
+            // 4. Переопределяем метод update для handle.
             update: (newZone: ZoneData) => {
+                // Перед программным обновлением карты, поднимаем флаг.
+                isUpdatingByCode = true;
+                
+                // Вызываем основной метод `update`, который меняет геометрию на карте.
+                // Это вызовет `geometrychange`, но наш обработчик его проигнорирует.
                 this.update(handle, newZone);
+
+                // С небольшой задержкой опускаем флаг, чтобы снова слушать изменения от пользователя.
+                setTimeout(() => {
+                    isUpdatingByCode = false;
+                }, 50);
             },
             setEditable: (editable: boolean) => {
                 this.setEditable(handle, editable);
@@ -91,21 +117,37 @@ export class YandexZoneAdapter implements ZoneAdapter {
         const geoObject = handle.nativeHandle;
         const newStyle = newZoneData.style || {};
 
-        if (newZoneData.type === 'circle') {
-            geoObject.geometry.setCoordinates(toYandexCoords(newZoneData.geometry));
-            geoObject.geometry.setRadius(newZoneData.radius || 1000);
-        } else {
-            // BUG FIX: Polygon coordinates must be wrapped in an array (for outer contour)
-            geoObject.geometry.setCoordinates([toYandexCoords(newZoneData.geometry)]);
+        switch (newZoneData.type) {
+            case 'circle':
+                geoObject.geometry.setCoordinates(toYandexCoords(newZoneData.geometry));
+                geoObject.geometry.setRadius(newZoneData.radius || 1000);
+                break;
+            case 'polygon':
+            case 'rectangle':
+                // Polygon coordinates must be wrapped in an array (for outer contour)
+                geoObject.geometry.setCoordinates([toYandexCoords(newZoneData.geometry)]);
+                break;
+            case 'polyline':
+                // Polyline coordinates are a simple array
+                geoObject.geometry.setCoordinates(toYandexCoords(newZoneData.geometry));
+                break;
         }
 
-        geoObject.options.set({
+        const newOptions: Record<string, any> = {
             fillColor: newStyle.fillColor,
             fillOpacity: newStyle.fillOpacity,
             strokeColor: newStyle.strokeColor,
             strokeOpacity: newStyle.strokeOpacity,
             strokeWidth: newStyle.strokeWidth,
-        });
+        };
+
+        // Polylines don't have fill properties
+        if (newZoneData.type === 'polyline') {
+            delete newOptions.fillColor;
+            delete newOptions.fillOpacity;
+        }
+
+        geoObject.options.set(newOptions);
     }
 
     setEditable(handle: ProviderZoneHandle, editable: boolean): void {

@@ -21,6 +21,15 @@ function ZoneCard({ zone, setZones }: { zone: ZoneData, setZones: Dispatch<SetSt
     setZones(prev => prev.map(z => z.id === zone.id ? { ...z, editable: !z.editable } : z));
   };
 
+  const handleRadiusChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newRadius = Number(e.target.value);
+    setZones(prev =>
+      prev.map(z =>
+        z.id === zone.id ? { ...z, radius: newRadius } : z
+      )
+    );
+  };
+
   return (
     <div className="p-3 bg-sidebar-accent rounded mb-2 space-y-2">
       <div className="flex justify-between items-center">
@@ -48,6 +57,22 @@ function ZoneCard({ zone, setZones }: { zone: ZoneData, setZones: Dispatch<SetSt
           </button>
         </div>
       </div>
+      
+      {zone.type === 'circle' && (
+        <div className="pt-2 border-t border-sidebar-border">
+          <label className="block text-xs font-medium text-sidebar-foreground/70 mb-1">
+            Радиус (в метрах)
+          </label>
+          <input
+            type="number"
+            step="100"
+            value={zone.radius || 0}
+            onChange={handleRadiusChange}
+            className="w-full p-2 rounded-md bg-sidebar text-sidebar-foreground border border-sidebar-border focus:outline-none focus:ring-2 focus:ring-sidebar-ring text-sm"
+            placeholder="1000"
+          />
+        </div>
+      )}
     </div>
   );
 }

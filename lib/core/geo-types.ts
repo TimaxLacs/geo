@@ -56,9 +56,9 @@ export interface ZoneData {
   id: string;
   provider: ProviderId;
   type: ZoneType;
-  geometry: LatLng[] | LatLng; // Массив вершин для полигонов/линий, центр для круга
-  radius?: number; // Только для круга (в метрах)
-  editable?: boolean;
+  geometry: LatLng | LatLng[];
+  radius?: number;
+  editable: boolean;
   meta?: {
     title?: string;
     description?: string;
