@@ -513,47 +513,49 @@ export default function Page() {
   };
 
   return (
-    <SidebarLayout sidebarData={sidebar} breadcrumb={[{ title: pckg.name, link: '/' }]}>
-      <div className="p-6">
-        {/* Используем гибкую сетку с учетом ширины карты */}
-        <div className={`grid gap-6 ${
-          isWideMap 
-            ? 'grid-cols-1' // При широкой карте - панель сверху
-            : 'grid-cols-[1fr_300px]' // При обычной карте - панель справа
-        }`}>
-          
-          {/* Основной контент с картой - всегда первый в DOM */}
-          <div style={{ width: '100%', height: '100%', position: 'relative' }}>
-            {selected ? (
-              <div className="space-y-4">
-                <div 
-                  style={{ width: mapSize.width + 'px', height: mapSize.height + 'px', border: '2px solid #e5e7eb', borderRadius: '8px' }}
-                >
-                  <Geo 
-                    key={`${selected}-${mapKey}`}
-                    ref={geoRef} 
-                    provider={selected} 
-                    onPosition={handlePositionChange}
-                    onReady={() => setReadyProvider(selected as ProviderId)}
-                    {...mapParams} 
-                  />
+    <SidebarLayout sidebarData={sidebar} breadcrumb={[{ title: pckg.name, link: '/' }]} h-full>
+      <main className="flex flex-col h-full overflow-hidden">
+        <div className="p-6" >
+          {/* Используем гибкую сетку с учетом ширины карты */}
+          <div
+            className="grid grid-cols-[1fr_380px] w-full"
+            style={{ height: mapSize.height + 'px' }}
+          >
+            {/* Основной контент с картой - всегда первый в DOM */}
+            <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+              {selected ? (
+                <div className="space-y-4">
+                  <div 
+                    style={{ width: mapSize.width + 'px', height: mapSize.height + 'px', border: '2px solid #e5e7eb', borderRadius: '8px' }}
+                  >
+                    <Geo 
+                      key={`${selected}-${mapKey}`}
+                      ref={geoRef} 
+                      provider={selected} 
+                      onPosition={handlePositionChange}
+                      onReady={() => setReadyProvider(selected as ProviderId)}
+                      {...mapParams} 
+                    />
+                  </div>
+                  <CodeTemplate provider={selected} params={mapParams} />
                 </div>
-                <CodeTemplate provider={selected} params={mapParams} />
-              </div>
-            ) : (
-              <div className="flex items-center justify-center h-96 bg-gray-100 dark:bg-gray-800 rounded-lg" style={{ width: '100%', height: '100%' }}>
-                <div className="text-center text-gray-500 dark:text-gray-400">
-                  <h2 className="text-xl font-semibold mb-2">Выберите провайдера карт</h2>
-                  <p>Используйте панель {isWideMap ? 'внизу' : 'справа'} для выбора карты</p>
+              ) : (
+                <div className="flex items-center justify-center h-96 bg-gray-100 dark:bg-gray-800 rounded-lg" style={{ width: '100%', height: '100%' }}>
+                  <div className="text-center text-gray-500 dark:text-gray-400">
+                    <h2 className="text-xl font-semibold mb-2">Выберите провайдера карт</h2>
+                    <p>Используйте панель {isWideMap ? 'внизу' : 'справа'} для выбора карты</p>
+                  </div>
                 </div>
+              )}
+            </div>
+            {/* Левая панель управления */}
+            <div className="bg-sidebar text-sidebar-foreground p-4 h-full overflow-y-auto">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold text-sidebar-foreground">
+                  Управление картами
+                </h2>
+                <ProviderSelector selected={selected} setSelected={setSelected} />
               </div>
-            )}
-          </div>
-
-          {/* Селектор провайдера - справа или снизу в зависимости от ширины */}
-          <div className="w-full min-h-0">
-            <div className="p-4 bg-sidebar border border-sidebar-border rounded-lg h-full overflow-y-scroll"> 
-              <ProviderSelector selected={selected} setSelected={setSelected} />
               {/* Передаем inputPosition в панель (показываем актуальные координаты от карты) */}
               <SettingMapSelector onUpdate={handleMapUpdate} position={inputPosition}/>
               
@@ -661,9 +663,9 @@ export default function Page() {
                 onSearchResultClick={handleSearchResultClick}
               />
               </div>
+            </div>
           </div>
-        </div>
-      </div>
-    </SidebarLayout>
-  );
-}
+        </main>
+      </SidebarLayout>
+    );
+  }
