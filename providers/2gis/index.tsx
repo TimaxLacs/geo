@@ -6,9 +6,13 @@ import { MarkerData, ProviderMarkerHandle, LatLng } from '@/lib/core/geo-types';
 import { markerEngine } from '@/lib/markers/engine';
 import TwoGISMarkerAdapter from '@/lib/2gis/markers';
 import { GeoObject } from '@/lib/core/geo-types';
+import { zoneEngine } from '@/lib/zones/engine';
+import { ZoneData, ProviderZoneHandle } from '@/lib/core/geo-types';
+import { TwoGisZoneAdapter } from '@/lib/2gis/zones';
 
-// Регистрируем адаптер при загрузке модуля
+// Регистрируем адаптеры
 markerEngine.registerAdapter('2gis', TwoGISMarkerAdapter);
+zoneEngine.registerAdapter('2gis', new TwoGisZoneAdapter());
 
 interface TwoGISMapProps {
   lng: number;
@@ -184,7 +188,25 @@ export class TwoGISGeoProvider {
     if (!this.mapInstance) throw new Error("2GIS map instance is not available.");
     return markerEngine.subscribeMapClick('2gis', { map: this.mapInstance }, callback);
   };
-  
+
+  // --- Методы для работы с зонами ---
+  addZone = (zone: ZoneData, onEditEnd: (newGeometry: LatLng | LatLng[], newRadius?: number) => void): ProviderZoneHandle => {
+    if (!this.mapInstance) throw new Error("2GIS map instance is not available.");
+    return zoneEngine.mount('2gis', { map: this.mapInstance }, zone, onEditEnd);
+  }
+
+  removeZone = (handle: ProviderZoneHandle): void => {
+    zoneEngine.unmount('2gis', handle);
+  }
+
+  updateZone = (handle: ProviderZoneHandle, newZoneData: ZoneData): void => {
+    zoneEngine.update('2gis', handle, newZoneData);
+  }
+
+  setZoneEditable = (handle: ProviderZoneHandle, editable: boolean): void => {
+    zoneEngine.setEditable('2gis', handle, editable);
+  }
+
   // --- МЕТОДЫ ДЛЯ ГЕОКОДИНГА (через наш API) ---
 
   geocode = async (address: string): Promise<GeoObject[]> => {

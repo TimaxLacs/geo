@@ -607,7 +607,7 @@ export default function Page() {
                       </p>
                       <button
                           onClick={() => {
-                            if (currentPolygonPoints.length < 3 || !selected) return;
+                            if (currentPolygonPoints.length < (drawingMode === 'polygon' ? 3 : 2) || !selected) return;
 
                             const newZone: ZoneData = {
                               id: uuidv4(),
