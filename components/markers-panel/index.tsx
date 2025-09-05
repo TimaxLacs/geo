@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { MarkerData, ProviderId, GeoObject, LatLng, GeoImperativeHandle } from "@/lib/core/geo-types";
 import { v4 as uuidv4 } from 'uuid';
 import { Pencil, Move, Trash2 } from 'lucide-react';
+import { geocode, reverseGeocode } from '@/lib/geocode'; // Импортируем функции геокодинга
 
 function GeocodePanel({ onResultClick, provider }: { 
   onResultClick: (obj: GeoObject) => void;
@@ -29,11 +30,8 @@ function GeocodePanel({ onResultClick, provider }: {
         setIsLoading(true);
         setError(null);
         try {
-          const response = await fetch(`/api/geocode?provider=${provider}&address=${encodeURIComponent(query)}`);
-          if (!response.ok) {
-            throw new Error('Ошибка при поиске адреса');
-          }
-          const data = await response.json();
+          // Вызываем функцию напрямую
+          const data = await geocode(provider, query);
           setResults(data);
         } catch (err: any) {
           setError(err.message);
@@ -90,65 +88,33 @@ function GeocodePanel({ onResultClick, provider }: {
 export function MarkersControlPanel({
   markers,
   setMarkers,
+  editingMarkerId,
+  setEditingMarkerId,
+  panelEditingMarkerId,
+  setPanelEditingMarkerId,
   currentLat,
   currentLng,
   provider,
-  geoHandle,
-  isMapReady,
   onSearchResultClick,
 }: {
   markers: MarkerData[];
   setMarkers: (updater: (prev: MarkerData[]) => MarkerData[] | MarkerData[]) => void;
+  editingMarkerId: string | null;
+  setEditingMarkerId: (id: string | null) => void;
+  panelEditingMarkerId: string | null;
+  setPanelEditingMarkerId: (id: string | null) => void;
   currentLat: number;
   currentLng: number;
   provider: ProviderId;
-  geoHandle: React.RefObject<GeoImperativeHandle | null>;
-  isMapReady: boolean;
   onSearchResultClick: (obj: GeoObject) => void;
 }) {
-  const [editingId, setEditingId] = useState<string | null>(null);
   const [editedLat, setEditedLat] = useState<number>(0);
   const [editedLng, setEditedLng] = useState<number>(0);
-  const [repositionId, setRepositionId] = useState<string | null>(null);
+  // Логика reposition и onMapClick переехала в app/page.tsx, так как требует доступа к карте.
+  // Этот компонент теперь отвечает только за UI списка маркеров.
   
-  useEffect(() => {
-    if (!geoHandle.current || !provider || !isMapReady) return;
-    
-    const unsubscribe = geoHandle.current.onMapClick(async (coords) => {
-      let address = 'Адрес не определен';
-      try {
-        const results = await geoHandle.current?.reverseGeocode(coords);
-        if (results && results.length > 0) {
-          address = results[0].text;
-        }
-      } catch (error) {
-        console.error("Ошибка обратного геокодирования при клике:", error);
-      }
-
-      if (repositionId) {
-        setMarkers(prev => 
-          prev.map(m => m.id === repositionId ? { ...m, position: coords, meta: { ...m.meta, address } } : m)
-        );
-        setRepositionId(null);
-      } else {
-        const newMarker: MarkerData = {
-          id: uuidv4(),
-          provider,
-          position: coords,
-          meta: {
-            title: `Маркер ${markers.length + 1}`,
-            address: address,
-          }
-        };
-        setMarkers(prev => [...prev, newMarker]);
-      }
-    });
-    
-    return () => unsubscribe();
-  }, [geoHandle, provider, markers, repositionId, setMarkers, isMapReady]);
-
   const addMarker = async () => {
-    if (!provider || !geoHandle.current) {
+    if (!provider) {
       alert("Сначала выберите провайдера карты");
       return;
     }
@@ -156,7 +122,7 @@ export function MarkersControlPanel({
     const coords = { lat: currentLat, lng: currentLng };
     let address = 'Адрес не определен';
     try {
-      const results = await geoHandle.current.reverseGeocode(coords);
+      const results = await reverseGeocode(provider, coords);
       if (results && results.length > 0) {
         address = results[0].text;
       }
@@ -180,30 +146,40 @@ export function MarkersControlPanel({
   };
 
   const startEdit = (m: MarkerData) => {
-    setEditingId(m.id);
+    setPanelEditingMarkerId(m.id);
     setEditedLat(m.position.lat);
     setEditedLng(m.position.lng);
   };
 
   const cancelEdit = () => {
-    setEditingId(null);
+    setPanelEditingMarkerId(null);
   };
 
-  const saveEdit = (id: string) => {
+  const saveEdit = async (id: string) => {
+    const newPosition = { lat: editedLat, lng: editedLng };
+    let newAddress = 'Не удалось обновить адрес';
+    try {
+      const results = await reverseGeocode(provider, newPosition);
+      if (results && results.length > 0) {
+        newAddress = results[0].text;
+      }
+    } catch (error) {
+      console.error("Ошибка обратного геокодирования при сохранении:", error);
+    }
+    
     setMarkers((prev) =>
-      prev.map((m) => (m.id === id ? { ...m, position: { lat: editedLat, lng: editedLng } } : m))
+      prev.map((m) => (m.id === id ? { ...m, position: newPosition, meta: { ...m.meta, address: newAddress } } : m))
     );
-    setEditingId(null);
+    setPanelEditingMarkerId(null);
   };
 
   const removeMarker = (id: string) => {
     setMarkers((prev) => prev.filter((m) => m.id !== id));
-    if (repositionId === id) setRepositionId(null);
+    if (editingMarkerId === id) setEditingMarkerId(null);
+    if (panelEditingMarkerId === id) setPanelEditingMarkerId(null);
   };
 
-  const toggleReposition = (id: string) => {
-    setRepositionId((prev) => (prev === id ? null : id));
-  };
+  // Удаляем toggleReposition
 
   return (
     <>
@@ -216,11 +192,6 @@ export function MarkersControlPanel({
         >
           + Добавить маркер
         </button>
-        {repositionId && (
-          <div className="mb-3 text-xs text-amber-600 dark:text-amber-400">
-            Режим репозиции включён.
-          </div>
-        )}
         <div className="space-y-3">
           {markers.length === 0 && (
             <div className="text-sm text-sidebar-foreground/70">
@@ -231,7 +202,7 @@ export function MarkersControlPanel({
             <div key={m.id} className="p-3 rounded-lg bg-sidebar-accent border border-sidebar-border/50">
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
-                  {editingId === m.id ? (
+                  {panelEditingMarkerId === m.id ? (
                     <div className="space-y-2">
                       <div>
                         <label className="text-xs text-sidebar-foreground/70">Заголовок</label>
@@ -288,7 +259,7 @@ export function MarkersControlPanel({
                           defaultValue={m.meta?.icon?.url || ''}
                           onChange={(e) => {
                             const newUrl = e.target.value;
-                            setMarkers(prev => prev.map(marker => marker.id === m.id ? { ...marker, meta: { ...marker.meta, icon: { ...marker.meta?.icon, url: newUrl, width: 32, height: 32 } } } : marker));
+                            setMarkers(prev => prev.map(marker => marker.id === m.id ? { ...marker, meta: { ...marker.meta, icon: { ...(marker.meta?.icon || { width: 32, height: 32 }), url: newUrl } } } : marker));
                           }}
                           className="w-full p-1 rounded-md bg-background/50 text-sidebar-foreground border border-sidebar-border focus:outline-none focus:ring-1 focus:ring-sidebar-ring text-sm"
                           placeholder="https://..."
@@ -334,29 +305,31 @@ export function MarkersControlPanel({
                   )}
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  {editingId === m.id ? (
+                  {panelEditingMarkerId === m.id ? (
                     <></>
                   ) : (
                     <>
                       <button
                         onClick={() => startEdit(m)}
                         className="p-2 rounded-md bg-sidebar-accent hover:bg-sidebar-border text-sidebar-accent-foreground"
+                        title="Редактировать маркер"
                       >
                         <Pencil size={14} />
                       </button>
                       <button
-                        onClick={() => toggleReposition(m.id)}
-                        className={`p-2 rounded-md transition-colors ${
-                          repositionId === m.id
-                            ? 'bg-amber-500 text-white'
-                            : 'bg-sidebar-accent hover:bg-sidebar-border text-sidebar-accent-foreground'
+                        onClick={() => setEditingMarkerId(editingMarkerId === m.id ? null : m.id)}
+                        className={`p-2 rounded-md transition-colors ${editingMarkerId === m.id 
+                          ? 'bg-primary text-primary-foreground' 
+                          : 'bg-sidebar-accent hover:bg-sidebar-border text-sidebar-accent-foreground'
                         }`}
+                        title={editingMarkerId === m.id ? "Выключить перемещение" : "Включить перемещение"}
                       >
                         <Move size={14} />
                       </button>
                       <button
                         onClick={() => removeMarker(m.id)}
                         className="p-2 rounded-md bg-destructive/80 hover:bg-destructive text-destructive-foreground"
+                        title="Удалить маркер"
                       >
                         <Trash2 size={14} />
                       </button>

@@ -1,8 +1,9 @@
-import React, { createContext, useContext, useMemo, useImperativeHandle, forwardRef } from 'react';
-import { YandexGeoProvider } from '../yandex/index';
-import { GoogleGeoProvider } from '../google/index';
-import { TwoGISGeoProvider } from '../2gis/index';
-import { MarkerData, ProviderMarkerHandle, GeoObject, LatLng, ZoneData, ProviderZoneHandle } from '@/lib/core/geo-types';
+import React, { useContext, useEffect, useMemo, useState, useCallback } from 'react';
+import YandexMap from '../yandex/index';
+import GoogleMap from '../google/index';
+import TwoGISMap from '../2gis/index';
+import { MarkerData, ProviderMarkerHandle, GeoObject, LatLng, ZoneData, ProviderZoneHandle, ProviderId } from '@/lib/core/geo-types';
+import { GeoContext, GeoContextValue, ZoneEditHandler } from './context';
 
 export interface GeoMapProps {
     lat: number;
@@ -11,175 +12,148 @@ export interface GeoMapProps {
     width?: number | string;
     height?: number | string;
     onPosition?: (position: { lat: number; lng: number; zoom: number }) => void;
-    onReady?: () => void;
+    // onReady теперь принимает более полную информацию
+    onReady?: (mapInstance: any, api: any) => void;
+    onMapClick?: (coords: { lat: number; lng: number }) => void;
 }
 
+// Этот интерфейс больше не используется для ref, но сохраним для описания провайдера
 export interface GeoProvider {
     GeoMap: React.ComponentType<GeoMapProps>;
-    // Императивные методы для обновления карты
-    setCenter?: (lat: number, lng: number) => void;
-    setZoom?: (zoom: number) => void;
-    updateMap?: (params: Partial<GeoMapProps>) => void;
-    
-    // Методы для работы с маркерами
-    addMarker?: (marker: MarkerData, onDragEnd: (newPosition: { lat: number, lng: number }) => void) => ProviderMarkerHandle;
-    removeMarker?: (handle: ProviderMarkerHandle) => void;
-    updateMarker?: (handle: ProviderMarkerHandle, marker: MarkerData) => void;
-    updateMarkerPosition?: (handle: ProviderMarkerHandle, position: { lat: number, lng: number }) => void;
-    onMapClick?: (callback: (coords: { lat: number, lng: number }) => void) => () => void;
-    
-    // Методы для работы с зонами
-    addZone?: (zone: ZoneData, onEditEnd: (newGeometry: LatLng[] | LatLng, newRadius?: number) => void) => ProviderZoneHandle;
-    removeZone?: (handle: ProviderZoneHandle) => void;
-    updateZone?: (handle: ProviderZoneHandle, newZoneData: ZoneData) => void;
-    setZoneEditable?: (handle: ProviderZoneHandle, editable: boolean) => void;
-
-    // Методы для геокодинга
-    geocode?: (address: string) => Promise<GeoObject[]>;
-    reverseGeocode?: (position: LatLng) => Promise<GeoObject[]>;
 }
 
-// Интерфейс для императивного API
-export interface GeoImperativeHandle {
-    setCenter: (lat: number, lng: number) => void;
-    setZoom: (zoom: number) => void;
-    updateMap: (params: Partial<GeoMapProps>) => void;
-    
-    // Методы для работы с маркерами, которые будут доступны через ref
-    addMarker: (marker: MarkerData, onDragEnd: (newPosition: { lat: number, lng: number }) => void) => ProviderMarkerHandle;
-    removeMarker: (handle: ProviderMarkerHandle) => void;
-    updateMarker: (handle: ProviderMarkerHandle, marker: MarkerData) => void;
-    updateMarkerPosition: (handle: ProviderMarkerHandle, position: { lat: number, lng: number }) => void;
-    onMapClick: (callback: (coords: { lat: number, lng: number }) => void) => () => void;
-    
-    // Методы для работы с зонами
-    addZone: (zone: ZoneData, onEditEnd: (newGeometry: LatLng[] | LatLng, newRadius?: number) => void) => ProviderZoneHandle;
-    removeZone: (handle: ProviderZoneHandle) => void;
-    updateZone: (handle: ProviderZoneHandle, newZoneData: ZoneData) => void;
-    setZoneEditable: (handle: ProviderZoneHandle, editable: boolean) => void;
+// Удаляем GeoImperativeHandle
 
-    // Методы для геокодинга
-    geocode: (address: string) => Promise<GeoObject[]>;
-    reverseGeocode: (position: LatLng) => Promise<GeoObject[]>;
-}
-
-export const GeoContext = createContext<GeoProvider | undefined>(undefined);
-export const useGeo = () => useContext(GeoContext);
-
-const classes: Record<string, any> = {
-    yandex: YandexGeoProvider,
-    google: GoogleGeoProvider,
-    '2gis': TwoGISGeoProvider,
+// Старый GeoContext удаляем, так как он импортируется из ./context
+// export const GeoContext = createContext<GeoProvider | undefined>(undefined);
+export const useGeo = () => {
+    const context = useContext(GeoContext);
+    if (!context) {
+        throw new Error('useGeo must be used within a Geo provider');
+    }
+    return context;
 };
 
+const classes: Record<string, any> = {
+    yandex: YandexMap,
+    google: GoogleMap,
+    '2gis': TwoGISMap,
+}; 
+
 export interface GeoProps extends GeoMapProps {
-    provider: string;
+    provider: ProviderId;
     children?: React.ReactNode;
+    editingZoneId?: string | null; // Проп для управления редактированием зон Яндекса
 }
 
-export const Geo = forwardRef<GeoImperativeHandle, GeoProps>((props, ref) => {
-    const { provider, children, ..._props } = props;
-    const _provider = useMemo(() => new classes[provider](), [provider]);
-    const GeoMap = _provider.GeoMap;
-    
-    // Экспортируем императивные методы через ref
-    useImperativeHandle(ref, () => ({
-        setCenter: (lat: number, lng: number) => {
-            if (_provider.setCenter) {
-                _provider.setCenter(lat, lng);
-            }
-        },
-        setZoom: (zoom: number) => {
-            if (_provider.setZoom) {
-                _provider.setZoom(zoom);
-            }
-        },
-        updateMap: (params: Partial<GeoMapProps>) => {
-            if (_provider.updateMap) {
-                _provider.updateMap(params);
-            }
-        },
-        addMarker: (marker: MarkerData, onDragEnd: (newPosition: { lat: number, lng: number }) => void) => {
-            if (_provider.addMarker) {
-                return _provider.addMarker(marker, onDragEnd);
-            }
-            throw new Error(`Provider ${provider} does not support addMarker.`);
-        },
-        removeMarker: (handle: ProviderMarkerHandle) => {
-            if (_provider.removeMarker) {
-                _provider.removeMarker(handle);
-            } else {
-              throw new Error(`Provider ${provider} does not support removeMarker.`);
-            }
-        },
-        updateMarker: (handle: ProviderMarkerHandle, marker: MarkerData) => {
-          if (_provider.updateMarker) {
-            _provider.updateMarker(handle, marker);
-          } else {
-            throw new Error(`Provider ${provider} does not support updateMarker.`);
-          }
-        },
-        updateMarkerPosition: (handle: ProviderMarkerHandle, position: { lat: number, lng: number }) => {
-            if (_provider.updateMarkerPosition) {
-                _provider.updateMarkerPosition(handle, position);
-            } else {
-                throw new Error(`Provider ${provider} does not support updateMarkerPosition.`);
-            }
-        },
-        onMapClick: (callback: (coords: { lat: number, lng: number }) => void) => {
-            if (_provider.onMapClick) {
-                return _provider.onMapClick(callback);
-            }
-            // Возвращаем пустую функцию отписки, если метод не поддерживается
-            return () => {};
-        },
-        addZone: (zone: ZoneData, onEditEnd: (newGeometry: LatLng[] | LatLng, newRadius?: number) => void) => {
-            if (_provider.addZone) {
-                return _provider.addZone(zone, onEditEnd);
-            }
-            throw new Error(`Provider ${provider} does not support addZone.`);
-        },
-        removeZone: (handle: ProviderZoneHandle) => {
-            if (_provider.removeZone) {
-                _provider.removeZone(handle);
-            } else {
-                throw new Error(`Provider ${provider} does not support removeZone.`);
-            }
-        },
-        updateZone: (handle: ProviderZoneHandle, newZoneData: ZoneData) => {
-            if (_provider.updateZone) {
-                _provider.updateZone(handle, newZoneData);
-            } else {
-                throw new Error(`Provider ${provider} does not support updateZone.`);
-            }
-        },
-        setZoneEditable: (handle: ProviderZoneHandle, editable: boolean) => {
-            if (_provider.setZoneEditable) {
-                _provider.setZoneEditable(handle, editable);
-            } else {
-                throw new Error(`Provider ${provider} does not support setZoneEditable.`);
-            }
-        },
-        geocode: async (address: string) => {
-            if (_provider.geocode) {
-                return _provider.geocode(address);
-            }
-            throw new Error(`Provider ${provider} does not support geocode.`);
-        },
-        reverseGeocode: async (position: LatLng) => {
-            if (_provider.reverseGeocode) {
-                return _provider.reverseGeocode(position);
-            }
-            throw new Error(`Provider ${provider} does not support reverseGeocode.`);
-        }
-    }), [_provider, provider]);
-    
-    return (
-        <GeoContext.Provider value={_provider}>
-            <GeoMap {..._props} />
-            {children}
-        </GeoContext.Provider>
-    );
-});
+export function Geo({ provider, children, onPosition, onReady, onMapClick, editingZoneId, ...mapProps }: GeoProps) {
+  const [mapContextState, setMapContextState] = useState<{
+    providerId: ProviderId | null;
+    mapInstance: any | null;
+    ymaps: any | null;
+  }>({
+    providerId: null,
+    mapInstance: null,
+    ymaps: null
+  });
 
-Geo.displayName = 'Geo';
+  const [zoneRegistry, setZoneRegistry] = useState<Record<string, { nativeObject: any, handler: ZoneEditHandler }>>({});
+
+  const registerZone = useCallback((id: string, nativeObject: any, handler: ZoneEditHandler) => {
+    setZoneRegistry(prev => ({ ...prev, [id]: { nativeObject, handler } }));
+  }, []);
+
+  const unregisterZone = useCallback((id: string) => {
+    setZoneRegistry(prev => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (mapContextState.providerId === 'yandex' && mapContextState.mapInstance && editingZoneId) {
+        const map = mapContextState.mapInstance;
+        
+        if (editingZoneId) {
+            const target = zoneRegistry[editingZoneId];
+            if (target) {
+                // Включаем редактирование для конкретного объекта
+                target.nativeObject.editor.start();
+                
+                // Подписываемся на событие изменения геометрии
+                const onGeometryChange = (e: any) => {
+                    const changedObject = e.get('target');
+                    const newGeometry = changedObject.geometry.getCoordinates();
+                    const newRadius = changedObject.geometry.getRadius ? changedObject.geometry.getRadius() : undefined;
+                    
+                    // Находим обработчик в реестре и вызываем его
+                    const registeredZone = Object.entries(zoneRegistry).find(
+                        ([_, value]) => value.nativeObject === changedObject
+                    );
+                    if (registeredZone) {
+                        registeredZone[1].handler(newGeometry, newRadius);
+                    }
+                };
+                
+                target.nativeObject.events.add('geometrychange', onGeometryChange);
+
+                // Функция очистки для отписки
+                return () => {
+                    target.nativeObject.events.remove('geometrychange', onGeometryChange);
+                    // Важно: не останавливаем редактор, если переключаемся на редактирование другой зоны
+                    if (target.nativeObject.editor.state.get('editing')) {
+                       target.nativeObject.editor.stop();
+                    }
+                };
+            }
+        } else {
+            // Если нет editingZoneId, выключаем все редакторы
+            Object.values(zoneRegistry).forEach(item => {
+                if (item.nativeObject.editor.state.get('editing')) {
+                    item.nativeObject.editor.stop();
+                }
+            });
+        }
+
+    }
+  }, [editingZoneId, mapContextState.mapInstance, mapContextState.providerId, zoneRegistry]);
+
+  const contextValue = useMemo<GeoContextValue>(() => ({
+    ...mapContextState,
+    registerZone,
+    unregisterZone,
+  }), [mapContextState, registerZone, unregisterZone]);
+
+  const handleMapReady = useCallback((mapInstance: any, api: any) => {
+    setMapContextState({
+        providerId: provider,
+        mapInstance: mapInstance,
+        ymaps: api,
+    });
+    if (onReady) {
+        onReady(mapInstance, api);
+    }
+  }, [provider, onReady]);
+
+  const GeoMap = useMemo(() => {
+    if (provider === 'yandex') return YandexMap;
+    if (provider === 'google') return GoogleMap;
+    if (provider === '2gis') return TwoGISMap;
+    return () => <div className="flex items-center justify-center h-full bg-gray-100">Выберите провайдера</div>;
+  }, [provider]);
+
+  return (
+    <GeoContext.Provider value={contextValue}>
+      <GeoMap
+        {...mapProps}
+        onReady={handleMapReady}
+        onPosition={onPosition}
+        onMapClick={onMapClick}
+      />
+      {mapContextState.mapInstance && children}
+    </GeoContext.Provider>
+  );
+}
+
+// Удаляем Geo.displayName, т.к. Geo больше не forwardRef-компонент

@@ -4,12 +4,13 @@ import { SidebarLayout } from "hasyx/components/sidebar/layout";
 import sidebar from "@/app/sidebar";
 import pckg from "@/package.json";
 import { useState, useRef, useEffect } from "react";
-import { Geo, GeoImperativeHandle } from "../providers/lib/index";
-import { LatLng, ProviderId, MarkerData, ProviderMarkerHandle, ZoneData, ProviderZoneHandle, ZoneType } from "@/lib/core/geo-types";
+import { Geo } from "../providers/lib/index"; // Обновленный импорт Geo
+import { LatLng, ProviderId, MarkerData, ZoneData, ZoneType, GeoObject } from "@/lib/core/geo-types"; // Убираем ProviderMarkerHandle и ProviderZoneHandle
 import { v4 as uuidv4 } from 'uuid';
 import { isEqual } from 'lodash';
 import { MarkersControlPanel } from "@/components/markers-panel";
-// Убираем импорт ZonesPanel
+import { GeoMarker } from '@/components/geo/marker'; // Импорт нового компонента
+import { GeoZone } from '@/components/geo/zone';   // Импорт нового компонента
 
 const MAP_OPTIONS: { label: string; value: ProviderId }[] = [
   { label: "Яндекс", value: "yandex" },
@@ -176,13 +177,18 @@ function SettingMapSelector({ onUpdate, position }: {
 }
 
 // Компонент карточки зоны
-function ZoneCard({ zone, setZones }: { zone: ZoneData, setZones: React.Dispatch<React.SetStateAction<ZoneData[]>> }) {
+function ZoneCard({ zone, setZones, editingZoneId, setEditingZoneId }: { 
+  zone: ZoneData, 
+  setZones: React.Dispatch<React.SetStateAction<ZoneData[]>>,
+  editingZoneId: string | null,
+  setEditingZoneId: (id: string | null) => void,
+}) {
   const handleDelete = () => {
     setZones(prev => prev.filter(z => z.id !== zone.id));
   };
 
   const toggleEditable = () => {
-    setZones(prev => prev.map(z => z.id === zone.id ? { ...z, editable: !z.editable } : z));
+    setEditingZoneId(editingZoneId === zone.id ? null : zone.id);
   };
 
   const handleRadiusChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -204,11 +210,11 @@ function ZoneCard({ zone, setZones }: { zone: ZoneData, setZones: React.Dispatch
           <button
             onClick={toggleEditable}
             className={`p-1.5 text-xs rounded transition-colors ${
-              zone.editable 
+              editingZoneId === zone.id
                 ? 'bg-primary text-primary-foreground' 
                 : 'bg-sidebar-accent hover:bg-sidebar-accent-foreground/20 text-sidebar-foreground'
             }`}
-            title={zone.editable ? "Выключить редактирование" : "Включить редактирование"}
+            title={editingZoneId === zone.id ? "Выключить редактирование" : "Включить редактирование"}
           >
             ✏️
           </button>
@@ -243,213 +249,30 @@ function ZoneCard({ zone, setZones }: { zone: ZoneData, setZones: React.Dispatch
 
 export default function Page() {
   const [selected, setSelected] = useState<ProviderId | "">("yandex");
-  const geoRef = useRef<GeoImperativeHandle>(null);
+  // Удаляем geoRef, markerHandles, zoneHandles
   const [mapSize, setMapSize] = useState({ width: 800, height: 500 });
   const [markers, setMarkers] = useState<MarkerData[]>([]);
-  const [markerHandles, setMarkerHandles] = useState<Record<string, { handle: ProviderMarkerHandle, marker: MarkerData }>>({});
-  const [readyProvider, setReadyProvider] = useState<ProviderId | "">("");
-
+  
   // Состояния для зон
   const [zones, setZones] = useState<ZoneData[]>([]);
-  const [zoneHandles, setZoneHandles] = useState<Record<string, ProviderZoneHandle>>({});
   const [drawingMode, setDrawingMode] = useState<ZoneType | null>(null);
   const [currentPolygonPoints, setCurrentPolygonPoints] = useState<LatLng[]>([]);
 
-  // Синхронизация маркеров на карте с состоянием
-  useEffect(() => {
-    const isReady = selected === readyProvider;
-    if (!geoRef.current || !selected || !isReady) return;
+  // Новые состояния для управления индивидуальным редактированием
+  const [editingMarkerId, setEditingMarkerId] = useState<string | null>(null);
+  const [panelEditingMarkerId, setPanelEditingMarkerId] = useState<string | null>(null);
+  const [editingZoneId, setEditingZoneId] = useState<string | null>(null);
 
-    const currentMarkerIds = markers.map(m => m.id);
-    const handledMarkerIds = Object.keys(markerHandles);
-
-    // Удаляем маркеры, которых больше нет в состоянии
-    handledMarkerIds.forEach(id => {
-      if (!currentMarkerIds.includes(id)) {
-        geoRef.current?.removeMarker(markerHandles[id].handle);
-        setMarkerHandles(prev => {
-          const newHandles = { ...prev };
-          delete newHandles[id];
-          return newHandles;
-        });
-      }
-    });
-
-    // Добавляем новые или обновляем существующие маркеры
-    markers.forEach(marker => {
-      const existing = markerHandles[marker.id];
-      
-      if (existing) {
-        // Маркер уже есть, проверяем, не изменились ли данные
-        // Сравниваем позицию и метаданные
-        if (
-          existing.marker.position.lat !== marker.position.lat || 
-          existing.marker.position.lng !== marker.position.lng
-        ) {
-          geoRef.current?.updateMarkerPosition(existing.handle, marker.position);
-        }
-        
-        // Для метаданных используем lodash.isEqual для глубокого сравнения
-        if (!isEqual(existing.marker.meta, marker.meta)) {
-          geoRef.current?.updateMarker(existing.handle, marker);
-        }
-
-        // Обновляем данные в нашем кэше в любом случае, если что-то могло измениться
-        if (existing.marker !== marker) {
-          setMarkerHandles(prev => ({
-            ...prev,
-            [marker.id]: { ...existing, marker: marker }
-          }));
-        }
-
-      } else {
-        // Новый маркер, добавляем его
-        if (marker.provider === selected) {
-          
-          const handleDragEnd = async (newPosition: LatLng) => {
-            // Сначала получаем адрес для новой позиции
-            let newAddress = 'Не удалось обновить адрес';
-            try {
-              const results = await geoRef.current?.reverseGeocode(newPosition);
-              if (results && results.length > 0) {
-                newAddress = results[0].text;
-              }
-            } catch (error) {
-              console.error("Ошибка обратного геокодирования при перетаскивании:", error);
-            }
-            
-            setMarkers(prev => 
-              prev.map(m => m.id === marker.id ? { ...m, position: newPosition, meta: { ...m.meta, address: newAddress } } : m)
-            );
-          };
-
-          const handle = geoRef.current?.addMarker(marker, handleDragEnd);
-
-          if (handle) {
-            setMarkerHandles(prev => ({ ...prev, [marker.id]: { handle, marker: marker } }));
-          }
-        }
-      }
-    });
-
-  }, [markers, selected, geoRef, readyProvider]);
-
-  // Синхронизация зон на карте с состоянием
-  useEffect(() => {
-    const isReady = selected === readyProvider;
-    if (!geoRef.current || !selected || !isReady) return;
-  
-    const currentZoneIds = zones.map(z => z.id);
-    const handledZoneIds = Object.keys(zoneHandles);
-  
-    // Удаляем зоны, которых больше нет в состоянии
-    handledZoneIds.forEach(id => {
-      if (!currentZoneIds.includes(id)) {
-        zoneHandles[id].remove();
-        setZoneHandles(prev => {
-          const newHandles = { ...prev };
-          delete newHandles[id];
-          return newHandles;
-        });
-      }
-    });
-  
-    // Добавляем новые или обновляем существующие зоны
-    zones.forEach(zone => {
-      const existingHandle = zoneHandles[zone.id];
-      
-      if (existingHandle) {
-        // Зона уже есть, обновляем ее
-        existingHandle.update(zone);
-        if (zone.editable !== undefined) {
-          existingHandle.setEditable(zone.editable);
-        }
-      } else {
-        // Новая зона, добавляем ее
-        if (zone.provider === selected) {
-          const onEditEnd = (newGeometry: LatLng[] | LatLng, newRadius?: number) => {
-            setZones(prev => prev.map(z => {
-              if (z.id === zone.id) {
-                const updatedZone = { ...z, geometry: newGeometry };
-                if (newRadius !== undefined && updatedZone.type === 'circle') {
-                  updatedZone.radius = newRadius;
-                }
-                return updatedZone;
-              }
-              return z;
-            }));
-          };
-
-          const handle = geoRef.current?.addZone(zone, onEditEnd);
-          if (handle) {
-            setZoneHandles(prev => ({ ...prev, [zone.id]: handle }));
-          }
-        }
-      }
-    });
-  
-  }, [zones, selected, geoRef, readyProvider]);
-
+  // Удаляем useEffect для синхронизации маркеров и зон - теперь это делается декларативно
 
   // Обработка кликов на карте для рисования зон
-  useEffect(() => {
-    if (!drawingMode || !geoRef.current || selected !== readyProvider) return;
-
-    const unsubscribe = geoRef.current.onMapClick((coords) => {
-      if (drawingMode === 'circle') {
-        const newZone: ZoneData = {
-          id: uuidv4(),
-          provider: selected as ProviderId,
-          type: 'circle',
-          geometry: coords,
-          radius: 1000, // 1 км по умолчанию
-          editable: false, // Изначально редактирование выключено
-          meta: { title: `Круг #${zones.length + 1}` },
-          style: { fillColor: '#ff000033', strokeColor: '#ff0000', strokeWidth: 2 },
-        };
-        setZones(prev => [...prev, newZone]);
-        setDrawingMode(null); // Выключаем режим рисования после создания
-      } else if (drawingMode === 'polygon' || drawingMode === 'polyline') {
-        const updatedPoints = [...currentPolygonPoints, coords];
-        setCurrentPolygonPoints(updatedPoints);
-        // Для завершения полигона/линии используется кнопка в UI
-      } else if (drawingMode === 'rectangle') {
-        if (currentPolygonPoints.length === 0) {
-          // Первый клик - задаем начальную точку
-          setCurrentPolygonPoints([coords]);
-        } else {
-          // Второй клик - завершаем прямоугольник
-          const p1 = currentPolygonPoints[0];
-          const p2 = coords;
-          
-          // Формируем геометрию прямоугольника из двух диагональных точек
-          const rectangleGeometry: LatLng[] = [
-            p1,
-            { lat: p1.lat, lng: p2.lng },
-            p2,
-            { lat: p2.lat, lng: p1.lng }
-          ];
-
-          const newZone: ZoneData = {
-            id: uuidv4(),
-            provider: selected as ProviderId,
-            type: 'polygon', // Прямоугольник представляется как полигон
-            geometry: rectangleGeometry,
-            editable: false, // Изначально редактирование выключено
-            meta: { title: `Прямоугольник #${zones.length + 1}` },
-            style: { fillColor: '#ff8c0033', strokeColor: '#ff8c00', strokeWidth: 2 },
-          };
-          setZones(prev => [...prev, newZone]);
-          setCurrentPolygonPoints([]);
-          setDrawingMode(null);
-        }
-      }
-    });
-
-    return () => unsubscribe();
-  }, [drawingMode, geoRef, selected, readyProvider, currentPolygonPoints, zones.length]);
-
-
+  // Для этого нам все еще нужен доступ к API карты. 
+  // Мы можем получить его через Context, но это усложнит компонент.
+  // Пока оставим эту логику здесь, но в будущем ее можно вынести в отдельный хук.
+  // Для этого нужно будет добавить onMapClick в GeoContext.
+  
+  // TODO: Вынести логику рисования в кастомный хук useMapDrawer(onDrawEnd)
+  
   // Два отдельных состояния для разделения источников
   const [inputPosition, setInputPosition] = useState({ lat: 55.7558, lng: 37.6173, zoom: 13 }); // Обновляется от карты
   const [mapPosition, setMapPosition] = useState({ lat: 55.7558, lng: 37.6173, zoom: 13 }); // Обновляется от инпутов
@@ -484,13 +307,13 @@ export default function Page() {
   };
   
   const handlePositionChange = (position: { lat: number; lng: number; zoom: number }) => {
-    console.log('handlePositionChange called (от драга карты):', position);
-    
-    // От драга карты - обновляем ТОЛЬКО инпуты, карту НЕ трогаем!
+    // При перетаскивании карты теперь обновляем ОБА состояния.
+    // Это необходимо для корректной работы контролируемых компонентов, как Google Maps.
     setInputPosition(position);
+    setMapPosition(position);
   };
 
-  const handleSearchResultClick = (obj: any) => {
+  const handleSearchResultClick = (obj: GeoObject) => {
     if (!selected) return;
 
     // 1. Центрируем карту на выбранном результате
@@ -504,12 +327,44 @@ export default function Page() {
       provider: selected,
       position: obj.coords,
       meta: {
-        title: obj.name,
+        title: `Маркер ${markers.length + 1}`, // Стандартное название
         description: obj.text,
         address: obj.text, // Сразу добавляем адрес
       }
     };
     setMarkers(prev => [...prev, newMarker]);
+  };
+
+  // Обработчик клика по карте для добавления маркеров
+  const handleMapClick = async (coords: { lat: number; lng: number }) => {
+    if (!selected) return;
+
+    // Пытаемся загрузить адрес для координат
+    let address = 'Адрес не определен';
+    try {
+      const { reverseGeocode } = await import('@/lib/geocode');
+      const results = await reverseGeocode(selected, coords);
+      if (results && results.length > 0) {
+        address = results[0].text;
+      }
+    } catch (error) {
+      console.error("Ошибка обратного геокодирования при клике на карту:", error);
+    }
+
+    setMarkers(prevMarkers => {
+      // Создаем новый маркер внутри функции обновления, используя `prevMarkers`
+      const newMarker: MarkerData = {
+        id: uuidv4(),
+        provider: selected,
+        position: coords,
+        meta: {
+          title: `Маркер ${prevMarkers.length + 1}`,
+          description: 'Добавлен кликом по карте',
+          address: address,
+        }
+      };
+      return [...prevMarkers, newMarker];
+    });
   };
 
   return (
@@ -530,12 +385,59 @@ export default function Page() {
                   >
                     <Geo 
                       key={`${selected}-${mapKey}`}
-                      ref={geoRef} 
                       provider={selected} 
+                      editingZoneId={editingZoneId}
                       onPosition={handlePositionChange}
-                      onReady={() => setReadyProvider(selected as ProviderId)}
+                      onMapClick={handleMapClick}
                       {...mapParams} 
-                    />
+                    >
+                      {/* Декларативный рендеринг маркеров и зон */}
+                      {markers.map(marker => (
+                        <GeoMarker
+                          key={marker.id}
+                          marker={marker}
+                          isEditing={editingMarkerId === marker.id}
+                          onChange={async (updatedMarker) => {
+                            // Если изменилась позиция, загружаем новый адрес
+                            if (updatedMarker.position.lat !== marker.position.lat || 
+                                updatedMarker.position.lng !== marker.position.lng) {
+                              try {
+                                const { reverseGeocode } = await import('@/lib/geocode');
+                                const results = await reverseGeocode(selected as ProviderId, updatedMarker.position);
+                                if (results && results.length > 0) {
+                                  updatedMarker = {
+                                    ...updatedMarker,
+                                    meta: {
+                                      ...updatedMarker.meta,
+                                      address: results[0].text
+                                    }
+                                  };
+                                }
+                              } catch (error) {
+                                console.error("Ошибка обратного геокодирования при перетаскивании:", error);
+                              }
+                            }
+                            setMarkers(prev => prev.map(m => m.id === updatedMarker.id ? updatedMarker : m));
+                          }}
+                          onRemove={() => {
+                            setMarkers(prev => prev.filter(m => m.id !== marker.id));
+                          }}
+                        />
+                      ))}
+                      {zones.map(zone => (
+                        <GeoZone
+                          key={zone.id}
+                          zone={zone}
+                          isEditing={editingZoneId === zone.id}
+                          onChange={(updatedZone) => {
+                            setZones(prev => prev.map(z => z.id === updatedZone.id ? updatedZone : z));
+                          }}
+                          onRemove={() => {
+                            setZones(prev => prev.filter(z => z.id !== zone.id));
+                          }}
+                        />
+                      ))}
+                    </Geo>
                   </div>
                   <CodeTemplate provider={selected} params={mapParams} />
                 </div>
@@ -646,7 +548,13 @@ export default function Page() {
 
                 <div className="space-y-2">
                   {zones.map(zone => (
-                    <ZoneCard key={zone.id} zone={zone} setZones={setZones} />
+                    <ZoneCard 
+                      key={zone.id} 
+                      zone={zone} 
+                      setZones={setZones} 
+                      editingZoneId={editingZoneId} 
+                      setEditingZoneId={setEditingZoneId} 
+                    />
                   ))}
                 </div>
               </div>
@@ -655,11 +563,13 @@ export default function Page() {
               <MarkersControlPanel
                 markers={markers}
                 setMarkers={setMarkers}
+                editingMarkerId={editingMarkerId}
+                setEditingMarkerId={setEditingMarkerId}
+                panelEditingMarkerId={panelEditingMarkerId}
+                setPanelEditingMarkerId={setPanelEditingMarkerId}
                 currentLat={inputPosition.lat}
                 currentLng={inputPosition.lng}
                 provider={selected as ProviderId}
-                geoHandle={geoRef}
-                isMapReady={selected === readyProvider}
                 onSearchResultClick={handleSearchResultClick}
               />
               </div>

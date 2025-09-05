@@ -43,9 +43,10 @@
   "dependencies": {
     "@2gis/mapgl": "^1.62.0",
     "@pbe/react-yandex-maps": "^1.2.5",
-    "@vis.gl/react-google-maps": "^1.5.4",
+    "@vis.gl/react-google-maps": "^1.5.5",
     "eruda": "^3.4.3",
     "hasyx": "^0.2.0-alpha.11",
+    "mapgl-grid-fork": "undefined",
     "next-ymaps3-components": "^1.0.2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
