@@ -10,39 +10,40 @@ interface TwoGISMapProps {
   onPosition?: (position: { lat: number; lng: number; zoom: number }) => void;
   onReady?: (mapInstance: any, api: any) => void;
   onMapClick?: (coords: { lat: number; lng: number }) => void;
-  [key: string]: any;
+  children?: React.ReactNode;
 }
 
-export default function TwoGISMap({ 
-    lng, 
-    lat, 
-    zoom = 13, 
-    onReady, 
-    onPosition,
-    onMapClick,
-    ...rest
-}: TwoGISMapProps) {
+export default function TwoGISMap({ lng, lat, zoom = 13, onPosition, onReady, onMapClick, children }: TwoGISMapProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const [mapInstance, setMapInstance] = useState<any>(null);
-  const { width, height, ref } = useResizeDetector();
+  const [mapglAPI, setMapglAPI] = useState<any>(null);
+  const { ref } = useResizeDetector({
+    onResize: () => {
+      mapInstance?.container.fitToViewport();
+    },
+  });
   const apiKey = process.env.NEXT_PUBLIC_2GIS_API_KEY;
+
+  const onMapClickRef = useRef(onMapClick);
+  onMapClickRef.current = onMapClick;
 
   useEffect(() => {
     let map: any = null;
-
-    if (mapContainerRef.current && !mapInstance && apiKey) {
+    if (mapContainerRef.current) {
       load().then((mapglAPI) => {
-        if (mapContainerRef.current) {
+        if (mapContainerRef.current && !map) {
           map = new mapglAPI.Map(mapContainerRef.current, {
             center: [lng, lat],
             zoom: zoom,
-            key: apiKey,
+            key: apiKey || '',
           });
-          
+
           new mapglAPI.Control(map, 'zoom', { position: 'bottomRight' });
           new mapglAPI.Control(map, 'fullscreen', { position: 'bottomRight' });
-
+          
+          setMapglAPI(mapglAPI);
           setMapInstance(map);
+          
           if (onReady) {
             onReady(map, mapglAPI);
           }
@@ -56,44 +57,67 @@ export default function TwoGISMap({
         setMapInstance(null);
       }
     };
-  }, []); // Run only once on mount
+  }, []); // Запускаем только один раз при монтировании
+
+  // Эффект для подписки на события после создания карты
+  useEffect(() => {
+    if (!mapInstance) return;
+
+    const clickHandler = (e: any) => {
+      if (onMapClickRef.current) {
+        onMapClickRef.current({ lat: e.lngLat[1], lng: e.lngLat[0] });
+      }
+    };
+    mapInstance.on('click', clickHandler);
+
+    if (onPosition) {
+      const handleMove = () => {
+        if (onPosition) {
+          const center = mapInstance.getCenter();
+          const currentZoom = mapInstance.getZoom();
+          onPosition({ lat: center[1], lng: center[0], zoom: currentZoom });
+        }
+      };
+      mapInstance.on('moveend', handleMove);
+      mapInstance.on('zoomend', handleMove);
+
+      return () => {
+        mapInstance.off('moveend', handleMove);
+        mapInstance.off('zoomend', handleMove);
+      };
+    }
+    
+    return () => {
+      mapInstance.off('click', clickHandler);
+    };
+  }, [mapInstance]); // Зависит только от mapInstance
+
+  // Эффекты для обновления центра и зума
+  useEffect(() => {
+    if (!mapInstance) return;
+    mapInstance.setCenter([lng, lat]);
+  }, [mapInstance, lng, lat]);
 
   useEffect(() => {
-    if (mapInstance) {
-        const handlePosition = () => {
-            if(onPosition) {
-                const center = mapInstance.getCenter();
-                const currentZoom = mapInstance.getZoom();
-                onPosition({ lat: center[1], lng: center[0], zoom: currentZoom });
-            }
-        };
-        const handleMapClick = (e: any) => {
-            if(onMapClick && e.lngLat) {
-                onMapClick({ lat: e.lngLat[1], lng: e.lngLat[0] });
-            }
-        };
-
-        mapInstance.on('moveend', handlePosition);
-        mapInstance.on('zoomend', handlePosition);
-        mapInstance.on('click', handleMapClick);
-
-        return () => {
-            mapInstance.off('moveend', handlePosition);
-            mapInstance.off('zoomend', handlePosition);
-            mapInstance.off('click', handleMapClick);
-        };
-    }
-  }, [mapInstance, onPosition, onMapClick]);
+    if (!mapInstance) return;
+    mapInstance.setZoom(zoom);
+  }, [mapInstance, zoom]);
 
   if (!apiKey) {
     return (
-      <div {...rest} className="flex items-center justify-center bg-gray-200 text-red-500">
+      <div className="flex items-center justify-center bg-gray-200 text-red-500">
         2GIS API key is not configured.
       </div>
     );
   }
 
   return (
-    <div {...rest} ref={mapContainerRef} style={{ width: '100%', height: '100%', borderRadius: '8px' }}/>
+    <div style={{ width: '100%', height: '100%', position: 'relative' }} ref={ref}>
+        <div 
+          ref={mapContainerRef} 
+          style={{ width: '100%', height: '100%', borderRadius: '8px', overflow: 'hidden' }}
+        />
+        {mapInstance && children}
+    </div>
   );
 } 

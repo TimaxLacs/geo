@@ -1,7 +1,7 @@
 'use client'
 
 import { APIProvider, Map, useMap } from '@vis.gl/react-google-maps';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useResizeDetector } from 'react-resize-detector';
 
 interface GoogleMapProps {
@@ -13,23 +13,19 @@ interface GoogleMapProps {
   onPosition?: (position: { lat: number; lng: number; zoom: number }) => void;
   onReady?: (mapInstance: any, api: any) => void;
   onMapClick?: (coords: { lat: number; lng: number }) => void;
-  [key: string]: any;
+  children?: React.ReactNode;
 }
 
-function GoogleMapInner({ lng, lat, zoom = 10, onPosition, onReady, onMapClick }: Omit<GoogleMapProps, 'width' | 'height'>) {
+function GoogleMapInner({ onReady, onPosition, onMapClick, children, lat, lng, zoom }: GoogleMapProps) {
   const map = useMap();
-
+  
   useEffect(() => {
-    if (map) {
-      if (onReady) {
-        onReady(map, (window as any).google);
-      }
-      // Включаем стандартные контролы Google
-      map.setOptions({
-        fullscreenControl: true,
-        zoomControl: true,
-      });
+    if (!map) return;
+    if (onReady) {
+      onReady(map, (window as any).google);
     }
+    // Включаем стандартные контролы Google
+    map.setOptions({ fullscreenControl: true, zoomControl: true });
   }, [map, onReady]);
   
   const handleBoundsChanged = () => {
@@ -45,8 +41,8 @@ function GoogleMapInner({ lng, lat, zoom = 10, onPosition, onReady, onMapClick }
       }
     }
   };
-  
-  const handleMapClickEvent = (e: any) => { // Use 'any' or the correct MapMouseEvent type from the library
+
+  const handleMapClickEvent = (e: any) => {
     if (onMapClick && e.detail.latLng) {
       onMapClick({
         lat: e.detail.latLng.lat,
@@ -65,27 +61,24 @@ function GoogleMapInner({ lng, lat, zoom = 10, onPosition, onReady, onMapClick }
       disableDefaultUI={true}
       gestureHandling={'greedy'}
       style={{ width: '100%', height: '100%', borderRadius: '8px' }}
-    />
+    >
+      {children}
+    </Map>
   );
 }
 
-export default function GoogleMap({ width = '100%', height = '100%', ...rest }: GoogleMapProps) {
+export default function GoogleMap({ lat, lng, zoom = 10, ...props }: GoogleMapProps) {
+  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
   const { ref } = useResizeDetector();
 
-  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-
   if (!apiKey) {
-    return (
-      <div style={{ width, height }} className="flex items-center justify-center bg-gray-200 text-red-500">
-        Google Maps API key is not configured.
-      </div>
-    );
+    return <div className="flex items-center justify-center bg-gray-200 text-red-500">Google Maps API key is not configured.</div>;
   }
-
+  
   return (
-    <div style={{ width, height, position: 'relative', borderRadius: '8px', overflow: 'hidden' }} ref={ref}>
+    <div ref={ref} style={{ width: '100%', height: '100%' }}>
       <APIProvider apiKey={apiKey}>
-        <GoogleMapInner {...rest} />
+        <GoogleMapInner lat={lat} lng={lng} zoom={zoom} {...props} />
       </APIProvider>
     </div>
   );

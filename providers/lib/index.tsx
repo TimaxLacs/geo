@@ -72,52 +72,61 @@ export function Geo({ provider, children, onPosition, onReady, onMapClick, editi
   }, []);
 
   useEffect(() => {
-    if (mapContextState.providerId === 'yandex' && mapContextState.mapInstance && editingZoneId) {
-        const map = mapContextState.mapInstance;
-        
-        if (editingZoneId) {
-            const target = zoneRegistry[editingZoneId];
-            if (target) {
-                // Включаем редактирование для конкретного объекта
-                target.nativeObject.editor.start();
-                
-                // Подписываемся на событие изменения геометрии
-                const onGeometryChange = (e: any) => {
-                    const changedObject = e.get('target');
-                    const newGeometry = changedObject.geometry.getCoordinates();
-                    const newRadius = changedObject.geometry.getRadius ? changedObject.geometry.getRadius() : undefined;
-                    
-                    // Находим обработчик в реестре и вызываем его
-                    const registeredZone = Object.entries(zoneRegistry).find(
-                        ([_, value]) => value.nativeObject === changedObject
-                    );
-                    if (registeredZone) {
-                        registeredZone[1].handler(newGeometry, newRadius);
-                    }
-                };
-                
-                target.nativeObject.events.add('geometrychange', onGeometryChange);
+    // Централизованное управление редактором Яндекс.Карт
+    if (mapContextState.providerId !== 'yandex' || !mapContextState.mapInstance) {
+        return;
+    }
 
-                // Функция очистки для отписки
-                return () => {
-                    target.nativeObject.events.remove('geometrychange', onGeometryChange);
-                    // Важно: не останавливаем редактор, если переключаемся на редактирование другой зоны
-                    if (target.nativeObject.editor.state.get('editing')) {
-                       target.nativeObject.editor.stop();
-                    }
-                };
-            }
-        } else {
-            // Если нет editingZoneId, выключаем все редакторы
-            Object.values(zoneRegistry).forEach(item => {
-                if (item.nativeObject.editor.state.get('editing')) {
-                    item.nativeObject.editor.stop();
-                }
-            });
+    // Сначала останавливаем редактирование для всех зон, кроме текущей
+    Object.entries(zoneRegistry).forEach(([id, { nativeObject }]) => {
+        if (id !== editingZoneId && nativeObject.editor.state.get('editing')) {
+            nativeObject.editor.stop();
+        }
+    });
+
+    // Теперь активируем редактор для нужной зоны
+    const target = editingZoneId ? zoneRegistry[editingZoneId] : null;
+    if (target) {
+        if (!target.nativeObject.editor.state.get('editing')) {
+            target.nativeObject.editor.start();
         }
 
+        const onGeometryChange = (e: any) => {
+            const changedObject = e.get('target');
+            // Убедимся, что событие пришло от нашего целевого объекта
+            if (changedObject === target.nativeObject) {
+                const newNativeGeometry = changedObject.geometry.getCoordinates();
+                const newRadius = changedObject.geometry.getRadius ? changedObject.geometry.getRadius() : undefined;
+                
+                // Используем fromYandexCoords для конвертации
+                const fromYandexCoords = (yandexCoords: number[] | number[][]): LatLng | LatLng[] => {
+                    if (Array.isArray(yandexCoords[0])) { // Массив массивов
+                        return (yandexCoords as number[][]).map(p => ({ lat: p[0], lng: p[1] }));
+                    }
+                    const p = yandexCoords as number[];
+                    return { lat: p[0], lng: p[1] };
+                };
+                
+                if (newNativeGeometry) {
+                    const newCoords = fromYandexCoords(newNativeGeometry);
+                    target.handler(newCoords, newRadius);
+                }
+            }
+        };
+
+        // Используем editor.events, а не events самого объекта
+        target.nativeObject.editor.events.add('geometrychange', onGeometryChange);
+
+        return () => {
+            target.nativeObject.editor.events.remove('geometrychange', onGeometryChange);
+            // Останавливаем редактор только если компонент размонтируется или ID изменится
+            // и он все еще активен
+            if (target.nativeObject.editor.state.get('editing')) {
+                target.nativeObject.editor.stop();
+            }
+        };
     }
-  }, [editingZoneId, mapContextState.mapInstance, mapContextState.providerId, zoneRegistry]);
+  }, [editingZoneId, mapContextState.providerId, zoneRegistry]);
 
   const contextValue = useMemo<GeoContextValue>(() => ({
     ...mapContextState,
@@ -150,8 +159,9 @@ export function Geo({ provider, children, onPosition, onReady, onMapClick, editi
         onReady={handleMapReady}
         onPosition={onPosition}
         onMapClick={onMapClick}
-      />
-      {mapContextState.mapInstance && children}
+      >
+        {mapContextState.mapInstance && mapContextState.ymaps && children}
+      </GeoMap>
     </GeoContext.Provider>
   );
 }

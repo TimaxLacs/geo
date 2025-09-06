@@ -31,6 +31,9 @@ function YandexMapInner({ lng, lat, zoom = 10, onPosition, onReady, onMapClick, 
   const ymaps = useYMaps(['Map', 'Placemark', 'Circle', 'Polygon', 'Polyline', 'geoObject.addon.editor']);
   const { width, height, ref } = useResizeDetector();
 
+  const onMapClickRef = useRef(onMapClick);
+  onMapClickRef.current = onMapClick;
+
   useEffect(() => {
     // Проверяем, что ymaps загружен, API готов и контейнер существует
     if (ymaps && ymaps.Map && mapContainer.current && !mapInstance && width && height) {
@@ -54,13 +57,12 @@ function YandexMapInner({ lng, lat, zoom = 10, onPosition, onReady, onMapClick, 
       }
       
       // Добавляем обработчик клика по карте
-      if (onMapClick) {
-        const handleMapClick = (e: any) => {
+      map.events.add('click', (e: any) => {
+        if (onMapClickRef.current) {
           const coords = e.get('coords');
-          onMapClick({ lat: coords[0], lng: coords[1] });
-        };
-        map.events.add('click', handleMapClick);
-      }
+          onMapClickRef.current({ lat: coords[0], lng: coords[1] });
+        }
+      });
 
       // Вызываем onReady с экземплярами карты и API
       if (onReady) {

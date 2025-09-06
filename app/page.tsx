@@ -339,6 +339,56 @@ export default function Page() {
   const handleMapClick = async (coords: { lat: number; lng: number }) => {
     if (!selected) return;
 
+    // --- НАЧАЛО: Логика для рисования зон ---
+    if (drawingMode) {
+      if (drawingMode === 'circle') {
+        const newZone: ZoneData = {
+          id: uuidv4(),
+          provider: selected as ProviderId,
+          type: 'circle',
+          geometry: coords,
+          radius: 1000, // 1 км по умолчанию
+          meta: { title: `Круг #${zones.length + 1}` },
+          style: { fillColor: '#ff000033', strokeColor: '#ff0000', strokeWidth: 2 },
+        };
+        setZones(prev => [...prev, newZone]);
+        setDrawingMode(null); // Выключаем режим рисования после создания
+      } else if (drawingMode === 'polygon' || drawingMode === 'polyline') {
+        setCurrentPolygonPoints(prevPoints => [...prevPoints, coords]);
+        // Завершение полигона/линии происходит по кнопке в UI, здесь только добавляем точки
+      } else if (drawingMode === 'rectangle') {
+        if (currentPolygonPoints.length === 0) {
+          // Первый клик - задаем начальную точку
+          setCurrentPolygonPoints([coords]);
+        } else {
+          // Второй клик - завершаем прямоугольник
+          const p1 = currentPolygonPoints[0];
+          const p2 = coords;
+          
+          const rectangleGeometry: LatLng[] = [
+            p1,
+            { lat: p1.lat, lng: p2.lng },
+            p2,
+            { lat: p2.lat, lng: p1.lng }
+          ];
+
+          const newZone: ZoneData = {
+            id: uuidv4(),
+            provider: selected as ProviderId,
+            type: 'polygon', // Прямоугольник представляется как полигон
+            geometry: rectangleGeometry,
+            meta: { title: `Прямоугольник #${zones.length + 1}` },
+            style: { fillColor: '#ff8c0033', strokeColor: '#ff8c00', strokeWidth: 2 },
+          };
+          setZones(prev => [...prev, newZone]);
+          setCurrentPolygonPoints([]);
+          setDrawingMode(null);
+        }
+      }
+      return; // Прерываем выполнение, чтобы не создавать маркер
+    }
+    // --- КОНЕЦ: Логика для рисования зон ---
+
     // Пытаемся загрузить адрес для координат
     let address = 'Адрес не определен';
     try {
