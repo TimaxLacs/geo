@@ -23,21 +23,26 @@ interface YandexMapProps {
   onReady?: (mapInstance: any, api: any) => void;
   onMapClick?: (coords: { lat: number; lng: number }) => void;
   children?: React.ReactNode;
+  editingZoneId?: string | null;
 }
 
 // Внутренний компонент, который использует useYMaps
-function YandexMapInner({ lng, lat, zoom = 10, onPosition, onReady, onMapClick, children }: YandexMapProps) {
+function YandexMapInner({ lng, lat, zoom = 10, onPosition, onReady, onMapClick, children, editingZoneId }: YandexMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const [mapInstance, setMapInstance] = useState<any>(null);
   const ymaps = useYMaps(['Map', 'Placemark', 'Circle', 'Polygon', 'Polyline', 'geoObject.addon.editor']);
-  const { width, height, ref } = useResizeDetector();
+  const { ref } = useResizeDetector({
+    onResize: () => {
+      mapInstance?.container.fitToViewport();
+    }
+  });
 
   const onMapClickRef = useRef(onMapClick);
   onMapClickRef.current = onMapClick;
 
   useEffect(() => {
     // Проверяем, что ymaps загружен, API готов и контейнер существует
-    if (ymaps && ymaps.Map && mapContainer.current && !mapInstance && width && height) {
+    if (ymaps && ymaps.Map && mapContainer.current && !mapInstance) {
       const map = new ymaps.Map(mapContainer.current, {
         center: [lat, lng],
         zoom,
@@ -77,7 +82,7 @@ function YandexMapInner({ lng, lat, zoom = 10, onPosition, onReady, onMapClick, 
         setMapInstance(null);
       }
     }
-  }, [ymaps, width, height]); // Создаем карту только один раз при загрузке API
+  }, [ymaps]); // Убираем width и height, так как карта создается один раз, а ресайз обрабатывается отдельно
 
   // Обновляем центр карты при изменении пропсов (теперь всегда можно обновлять)
   useEffect(() => {

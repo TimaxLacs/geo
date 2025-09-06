@@ -14,9 +14,10 @@ interface GoogleMapProps {
   onReady?: (mapInstance: any, api: any) => void;
   onMapClick?: (coords: { lat: number; lng: number }) => void;
   children?: React.ReactNode;
+  editingZoneId?: string | null;
 }
 
-function GoogleMapInner({ onReady, onPosition, onMapClick, children, lat, lng, zoom }: GoogleMapProps) {
+function GoogleMapInner({ onReady, onPosition, onMapClick, children, lat, lng, zoom, editingZoneId }: GoogleMapProps) {
   const map = useMap();
   
   useEffect(() => {

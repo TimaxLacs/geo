@@ -11,9 +11,10 @@ interface TwoGISMapProps {
   onReady?: (mapInstance: any, api: any) => void;
   onMapClick?: (coords: { lat: number; lng: number }) => void;
   children?: React.ReactNode;
+  editingZoneId?: string | null;
 }
 
-export default function TwoGISMap({ lng, lat, zoom = 13, onPosition, onReady, onMapClick, children }: TwoGISMapProps) {
+export default function TwoGISMap({ lng, lat, zoom = 13, onPosition, onReady, onMapClick, children, editingZoneId }: TwoGISMapProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const [mapInstance, setMapInstance] = useState<any>(null);
   const [mapglAPI, setMapglAPI] = useState<any>(null);

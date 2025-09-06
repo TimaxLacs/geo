@@ -107,17 +107,6 @@ export function GeoZone({ zone, isEditing, onChange, onRemove }: GeoZoneProps) {
       if (nativeObject) {
         nativeObjectRef.current = nativeObject;
         mapInstance.geoObjects.add(nativeObject);
-
-        if (providerId === 'yandex' && geoContext.registerZone) {
-          const handleEditEnd = (newGeometry: LatLng[] | LatLng, newRadius?: number) => {
-            const updatedZone = { ...zone, geometry: newGeometry } as ZoneData;
-            if (newRadius !== undefined) {
-              (updatedZone as any).radius = newRadius;
-            }
-            onChange(updatedZone);
-          };
-          geoContext.registerZone(zone.id, nativeObject, handleEditEnd);
-        }
       }
     } else if (providerId === 'google') {
       const google = ymaps as any;
@@ -185,18 +174,13 @@ export function GeoZone({ zone, isEditing, onChange, onRemove }: GeoZoneProps) {
 
     return () => {
       if (!nativeObjectRef.current) return;
-      if (geoContext?.providerId === 'yandex' && geoContext.unregisterZone) {
-        geoContext.unregisterZone(zone.id);
+      if (geoContext?.providerId === 'yandex') {
+        geoContext.mapInstance.geoObjects.remove(nativeObjectRef.current);
+      } else if (geoContext?.providerId === 'google') {
+        nativeObjectRef.current.setMap(null);
+      } else if (geoContext?.providerId === '2gis') {
+        nativeObjectRef.current.destroy();
       }
-      try {
-        if (geoContext?.providerId === 'yandex') {
-          geoContext.mapInstance.geoObjects.remove(nativeObjectRef.current);
-        } else if (geoContext?.providerId === 'google') {
-          nativeObjectRef.current.setMap(null);
-        } else if (geoContext?.providerId === '2gis') {
-          nativeObjectRef.current.destroy();
-        }
-      } catch {}
       nativeObjectRef.current = null;
     };
   }, [geoContext?.mapInstance, geoContext?.ymaps]);
@@ -314,56 +298,72 @@ export function GeoZone({ zone, isEditing, onChange, onRemove }: GeoZoneProps) {
   // Защита от бесконечного цикла обновлений
   const isUpdatingByCode = useRef(false);
   
-  // Режим редактирования (Google локально; Яндекс централизованно; 2ГИС — нет редактирования)
+  // Режим редактирования
   useEffect(() => {
     const obj = nativeObjectRef.current;
     if (!obj || !geoContext) return;
-    if (geoContext.providerId === 'yandex' || geoContext.providerId === '2gis') return;
 
-    // Google
-    if (geoContext.providerId === 'google') {
+    const { providerId, ymaps } = geoContext;
+    
+    // Используем ref, чтобы в замыкании всегда была актуальная версия
+    const onChangeRef = { current: onChange };
+
+    if (providerId === 'yandex') {
+      if (isEditing) {
+        // Редактор доступен только для Circle и Polygon
+        if (obj.editor && (zone.type === 'circle' || zone.type === 'polygon')) {
+          obj.editor.startEditing();
+          const geometryChangeHandler = () => {
+            const newNativeGeometry = obj.geometry.getCoordinates();
+            const newRadius = obj.geometry.getRadius ? obj.geometry.getRadius() : undefined;
+            const newCoords = fromYandexCoords(newNativeGeometry);
+            
+            const updatedZone = { ...zone, geometry: newCoords };
+            if (updatedZone.type === 'circle' && newRadius !== undefined) {
+              updatedZone.radius = newRadius;
+            }
+            onChangeRef.current(updatedZone);
+          };
+          obj.editor.events.add('geometrychange', geometryChangeHandler);
+          return () => {
+            obj.editor.events.remove('geometrychange', geometryChangeHandler);
+            if (obj.editor && obj.editor.state.get('editing')) {
+              obj.editor.stopEditing();
+            }
+          };
+        }
+      } else if (obj.editor && obj.editor.state.get('editing')) {
+        obj.editor.stopEditing();
+      }
+    } else if (providerId === 'google') {
       obj.setEditable(isEditing);
-      const google = geoContext.ymaps as any;
+      const google = ymaps as any;
       const listeners: any[] = [];
 
       if (isEditing) {
         if (zone.type === 'circle') {
-          const emit = () => {
-            if (isUpdatingByCode.current) return;
-            const center = obj.getCenter();
-            const radius = obj.getRadius();
-            onChange({ ...zone, geometry: { lat: center.lat(), lng: center.lng() }, radius });
-          };
-          listeners.push(obj.addListener('center_changed', emit));
-          listeners.push(obj.addListener('radius_changed', emit));
-        } else if (zone.type === 'polygon') {
-          const path = obj.getPath();
-          const sync = () => {
-            if (isUpdatingByCode.current) return;
-            const pts: LatLng[] = [];
-            for (let i = 0; i < path.getLength(); i++) {
-              const p = path.getAt(i);
-              pts.push({ lat: p.lat(), lng: p.lng() });
-            }
-            onChange({ ...zone, geometry: pts });
-          };
-          listeners.push(path.addListener('insert_at', sync));
-          listeners.push(path.addListener('set_at', sync));
-          listeners.push(path.addListener('remove_at', sync));
-        } else if (zone.type === 'polyline') {
-          const path = obj.getPath();
-          const sync = () => {
-            if (isUpdatingByCode.current) return;
-            const pts: LatLng[] = [];
-            for (let i = 0; i < path.getLength(); i++) {
-              const p = path.getAt(i);
-              pts.push({ lat: p.lat(), lng: p.lng() });
-            }
-            onChange({ ...zone, geometry: pts });
-          };
-          listeners.push(path.addListener('insert_at', sync));
-          listeners.push(path.addListener('set_at', sync));
-          listeners.push(path.addListener('remove_at', sync));
+            const emit = () => {
+              if (isUpdatingByCode.current) return;
+              const center = obj.getCenter();
+              const radius = obj.getRadius();
+              onChangeRef.current({ ...zone, geometry: { lat: center.lat(), lng: center.lng() }, radius });
+            };
+            listeners.push(obj.addListener('center_changed', emit));
+            listeners.push(obj.addListener('radius_changed', emit));
+        } else if (zone.type === 'polygon' || zone.type === 'polyline') {
+            const path = obj.getPath();
+            const sync = () => {
+              if (isUpdatingByCode.current) return;
+              const pts: LatLng[] = [];
+              for (let i = 0; i < path.getLength(); i++) {
+                const p = path.getAt(i);
+                pts.push({ lat: p.lat(), lng: p.lng() });
+              }
+              onChangeRef.current({ ...zone, geometry: pts });
+            };
+            listeners.push(path.addListener('insert_at', sync));
+            listeners.push(path.addListener('set_at', sync));
+            listeners.push(path.addListener('remove_at', sync));
         }
       }
 
@@ -371,7 +371,15 @@ export function GeoZone({ zone, isEditing, onChange, onRemove }: GeoZoneProps) {
         listeners.forEach(l => l && l.remove && l.remove());
       };
     }
-  }, [isEditing, geoContext?.providerId]);
+    // Для 2ГИС редактирование не поддерживается
+  }, [isEditing, nativeObjectRef.current, zone]); // Добавляем zone в зависимости
   
   return null; // Компонент не рендерит DOM
+}
+function fromYandexCoords(yandexCoords: number[] | number[][]): LatLng | LatLng[] {
+    if (Array.isArray(yandexCoords[0])) {
+        return (yandexCoords as number[][]).map(p => ({ lat: p[0], lng: p[1] }));
+    }
+    const p = yandexCoords as number[];
+    return { lat: p[0], lng: p[1] };
 }

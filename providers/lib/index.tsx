@@ -3,7 +3,7 @@ import YandexMap from '../yandex/index';
 import GoogleMap from '../google/index';
 import TwoGISMap from '../2gis/index';
 import { MarkerData, ProviderMarkerHandle, GeoObject, LatLng, ZoneData, ProviderZoneHandle, ProviderId } from '@/lib/core/geo-types';
-import { GeoContext, GeoContextValue, ZoneEditHandler } from './context';
+import { GeoContext, GeoContextValue } from './context';
 
 export interface GeoMapProps {
     lat: number;
@@ -57,82 +57,9 @@ export function Geo({ provider, children, onPosition, onReady, onMapClick, editi
     ymaps: null
   });
 
-  const [zoneRegistry, setZoneRegistry] = useState<Record<string, { nativeObject: any, handler: ZoneEditHandler }>>({});
-
-  const registerZone = useCallback((id: string, nativeObject: any, handler: ZoneEditHandler) => {
-    setZoneRegistry(prev => ({ ...prev, [id]: { nativeObject, handler } }));
-  }, []);
-
-  const unregisterZone = useCallback((id: string) => {
-    setZoneRegistry(prev => {
-      const next = { ...prev };
-      delete next[id];
-      return next;
-    });
-  }, []);
-
-  useEffect(() => {
-    // Централизованное управление редактором Яндекс.Карт
-    if (mapContextState.providerId !== 'yandex' || !mapContextState.mapInstance) {
-        return;
-    }
-
-    // Сначала останавливаем редактирование для всех зон, кроме текущей
-    Object.entries(zoneRegistry).forEach(([id, { nativeObject }]) => {
-        if (id !== editingZoneId && nativeObject.editor.state.get('editing')) {
-            nativeObject.editor.stop();
-        }
-    });
-
-    // Теперь активируем редактор для нужной зоны
-    const target = editingZoneId ? zoneRegistry[editingZoneId] : null;
-    if (target) {
-        if (!target.nativeObject.editor.state.get('editing')) {
-            target.nativeObject.editor.start();
-        }
-
-        const onGeometryChange = (e: any) => {
-            const changedObject = e.get('target');
-            // Убедимся, что событие пришло от нашего целевого объекта
-            if (changedObject === target.nativeObject) {
-                const newNativeGeometry = changedObject.geometry.getCoordinates();
-                const newRadius = changedObject.geometry.getRadius ? changedObject.geometry.getRadius() : undefined;
-                
-                // Используем fromYandexCoords для конвертации
-                const fromYandexCoords = (yandexCoords: number[] | number[][]): LatLng | LatLng[] => {
-                    if (Array.isArray(yandexCoords[0])) { // Массив массивов
-                        return (yandexCoords as number[][]).map(p => ({ lat: p[0], lng: p[1] }));
-                    }
-                    const p = yandexCoords as number[];
-                    return { lat: p[0], lng: p[1] };
-                };
-                
-                if (newNativeGeometry) {
-                    const newCoords = fromYandexCoords(newNativeGeometry);
-                    target.handler(newCoords, newRadius);
-                }
-            }
-        };
-
-        // Используем editor.events, а не events самого объекта
-        target.nativeObject.editor.events.add('geometrychange', onGeometryChange);
-
-        return () => {
-            target.nativeObject.editor.events.remove('geometrychange', onGeometryChange);
-            // Останавливаем редактор только если компонент размонтируется или ID изменится
-            // и он все еще активен
-            if (target.nativeObject.editor.state.get('editing')) {
-                target.nativeObject.editor.stop();
-            }
-        };
-    }
-  }, [editingZoneId, mapContextState.providerId, zoneRegistry]);
-
   const contextValue = useMemo<GeoContextValue>(() => ({
     ...mapContextState,
-    registerZone,
-    unregisterZone,
-  }), [mapContextState, registerZone, unregisterZone]);
+  }), [mapContextState]);
 
   const handleMapReady = useCallback((mapInstance: any, api: any) => {
     setMapContextState({
@@ -156,6 +83,7 @@ export function Geo({ provider, children, onPosition, onReady, onMapClick, editi
     <GeoContext.Provider value={contextValue}>
       <GeoMap
         {...mapProps}
+        editingZoneId={editingZoneId} // Просто пробрасываем editingZoneId дальше
         onReady={handleMapReady}
         onPosition={onPosition}
         onMapClick={onMapClick}
