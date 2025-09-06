@@ -7,6 +7,7 @@ import YandexMarkerAdapter from '@/lib/yandex/markers';
 import { GeoObject, LatLng } from '@/lib/core/geo-types';
 import { zoneEngine } from '@/lib/zones/engine';
 import { YandexZoneAdapter } from '@/lib/yandex/zones';
+import { GeoContext } from '@/providers/lib/context';
 
 // Регистрируем адаптеры при загрузке модуля
 markerEngine.registerAdapter('yandex', YandexMarkerAdapter);
@@ -19,13 +20,13 @@ interface YandexMapProps {
   width?: number | string;
   height?: number | string;
   onPosition?: (position: { lat: number; lng: number; zoom: number }) => void;
-  onReady?: (mapInstance: any, ymaps: any) => void;
+  onReady?: (mapInstance: any, api: any) => void;
   onMapClick?: (coords: { lat: number; lng: number }) => void;
-  [key: string]: any;
+  children?: React.ReactNode;
 }
 
-// Внутренний компонент, который использует useYMaps (копируем рабочий подход из lib/yandex/index.tsx)
-function YandexMapInner({ lng, lat, zoom = 10, onPosition, onReady, onMapClick, ...rest }: Omit<YandexMapProps, 'width' | 'height'>) {
+// Внутренний компонент, который использует useYMaps
+function YandexMapInner({ lng, lat, zoom = 10, onPosition, onReady, onMapClick, children }: YandexMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const [mapInstance, setMapInstance] = useState<any>(null);
   const ymaps = useYMaps(['Map', 'Placemark', 'Circle', 'Polygon', 'Polyline', 'geoObject.addon.editor']);
@@ -95,25 +96,23 @@ function YandexMapInner({ lng, lat, zoom = 10, onPosition, onReady, onMapClick, 
   }, [zoom, mapInstance]);
 
   return (
-    <div style={{ width: '100%', height: '100%', position: 'relative' }} ref={ref} {...rest}>
-      <div style={{ position: 'absolute', width: '100%', height: '100%' }}>
+    <div style={{ width: '100%', height: '100%', position: 'relative' }} ref={ref}>
         <div 
           ref={mapContainer} 
           style={{ width: '100%', height: '100%', borderRadius: '8px', overflow: 'hidden' }}
         />
-      </div>
+        {children}
     </div>
   );
 }
 
-// Внешний компонент с провайдером YMaps (как в рабочем lib/yandex/index.tsx)
+// Внешний компонент с провайдером YMaps
 export default function YandexMap(props: YandexMapProps) {
   return (
     <YMaps
       query={{
         apikey: process.env.NEXT_PUBLIC_YANDEX_API_KEY || '',
         lang: 'ru_RU',
-        load: 'Map,Placemark,Circle,Polygon,Polyline,geoObject.addon.editor'
       }}
     >
       <YandexMapInner {...props} />

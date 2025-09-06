@@ -417,6 +417,19 @@ export default function Page() {
     });
   };
 
+  const handleDrawingModeChange = (mode: ZoneType) => {
+    setDrawingMode(prev => {
+      if (prev === mode) {
+        // Если кликаем по той же кнопке, отменяем режим
+        setCurrentPolygonPoints([]);
+        return null;
+      }
+      // Иначе, включаем новый режим
+      setCurrentPolygonPoints([]);
+      return mode;
+    });
+  };
+
   return (
     <SidebarLayout sidebarData={sidebar} breadcrumb={[{ title: pckg.name, link: '/' }]} h-full>
       <main className="flex flex-col h-full overflow-hidden">
@@ -519,49 +532,41 @@ export default function Page() {
 
                 <div className="grid grid-cols-2 gap-2 mb-3">
                   <button
-                    onClick={() => setDrawingMode('circle')}
+                    onClick={() => handleDrawingModeChange('circle')}
                     className={`p-2 text-sm rounded transition-colors ${drawingMode === 'circle' ? 'bg-primary text-primary-foreground' : 'bg-sidebar-accent hover:bg-sidebar-accent-foreground/20 text-sidebar-foreground'}`}
                   >
                     + Круг
                   </button>
                   <button
-                    onClick={() => {
-                      setDrawingMode('polygon');
-                      setCurrentPolygonPoints([]);
-                    }}
+                    onClick={() => handleDrawingModeChange('polygon')}
                     className={`p-2 text-sm rounded transition-colors ${drawingMode === 'polygon' ? 'bg-primary text-primary-foreground' : 'bg-sidebar-accent hover:bg-sidebar-accent-foreground/20 text-sidebar-foreground'}`}
                   >
                     + Полигон
                   </button>
                   <button
-                    onClick={() => {
-                      setDrawingMode('polyline');
-                      setCurrentPolygonPoints([]);
-                    }}
+                    onClick={() => handleDrawingModeChange('polyline')}
                     className={`p-2 text-sm rounded transition-colors ${drawingMode === 'polyline' ? 'bg-primary text-primary-foreground' : 'bg-sidebar-accent hover:bg-sidebar-accent-foreground/20 text-sidebar-foreground'}`}
                   >
                     + Линия
                   </button>
                   <button
-                    onClick={() => {
-                      setDrawingMode('rectangle');
-                      setCurrentPolygonPoints([]);
-                    }}
+                    onClick={() => handleDrawingModeChange('rectangle')}
                     className={`p-2 text-sm rounded transition-colors ${drawingMode === 'rectangle' ? 'bg-primary text-primary-foreground' : 'bg-sidebar-accent hover:bg-sidebar-accent-foreground/20 text-sidebar-foreground'}`}
                   >
                     + Прямоугольник
                   </button>
                 </div>
                 
-                { (drawingMode === 'polygon' || drawingMode === 'polyline') && currentPolygonPoints.length > 0 && (
+                { (drawingMode === 'polygon' || drawingMode === 'polyline') && (
                   <div className="p-2 bg-sidebar-accent rounded mb-3 text-center">
                       <p className="text-xs text-sidebar-foreground mb-2">
                           Кликайте по карте, чтобы добавить точки. <br/>
                           Точек: {currentPolygonPoints.length}
                       </p>
-                      <button
-                          onClick={() => {
-                            if (currentPolygonPoints.length < (drawingMode === 'polygon' ? 3 : 2) || !selected) return;
+                      {currentPolygonPoints.length > 0 && (
+                        <button
+                            onClick={() => {
+                              if (currentPolygonPoints.length < (drawingMode === 'polygon' ? 3 : 2) || !selected) return;
 
                             const newZone: ZoneData = {
                               id: uuidv4(),
@@ -579,12 +584,13 @@ export default function Page() {
                             setZones(prev => [...prev, newZone]);
                             setCurrentPolygonPoints([]);
                             setDrawingMode(null);
-                          }}
-                          disabled={currentPolygonPoints.length < (drawingMode === 'polygon' ? 3 : 2)}
-                          className="w-full p-2 text-sm rounded bg-green-600 text-white disabled:bg-gray-500"
-                      >
-                          Завершить
-                      </button>
+                            }}
+                            disabled={currentPolygonPoints.length < (drawingMode === 'polygon' ? 3 : 2)}
+                            className="w-full p-2 text-sm rounded bg-green-600 text-white disabled:bg-gray-500"
+                        >
+                            Завершить
+                        </button>
+                      )}
                   </div>
                 )}
 
